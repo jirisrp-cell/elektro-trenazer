@@ -826,7 +826,7 @@ function giveUpOhm(){
 }
 
 /* ==================== AI ZKOUŠEJÍCÍ ==================== */
-let API_URL='';  // ← sem po nasazení backendu vlož adresu Railway služby, např. 'https://elektro-ai.up.railway.app'
+let API_URL='https://elektro-trenazer-production.up.railway.app/';   // ← sem po nasazení backendu vlož adresu Railway služby, např. 'https://elektro-ai.up.railway.app'
 let aiLevel='78', ai=null, aiBusy=false;
 function esc(s){ return String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
 function setApiUrl(v){ API_URL=v.trim(); try{ if(window.storage) window.storage.set('elektro-api-url', API_URL); }catch(e){} }
