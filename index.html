@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elektro trenažér</title>
+<style>
+:root{
+  --bg:#0e1420;          /* noční pracovní stůl */
+  --panel:#161f2e;       /* deska plošného spoje */
+  --panel2:#1c2739;
+  --line:#2a3a52;
+  --copper:#e29458;      /* měděná cesta */
+  --signal:#ffcf5c;      /* rozsvícený signál */
+  --ok:#4ade80;
+  --bad:#f87171;
+  --text:#e9eef6;
+  --muted:#93a4bb;
+  --mono:ui-monospace,'Cascadia Mono','JetBrains Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  min-height:100dvh;padding-bottom:40px;
+}
+.wrap{max-width:520px;margin:0 auto;padding:0 14px}
+header{padding:18px 0 10px}
+header h1{margin:0;font-size:20px;letter-spacing:.06em;text-transform:uppercase}
+header h1 span{color:var(--copper)}
+.meter{display:flex;gap:10px;margin-top:10px}
+.chip{
+  flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:8px 12px;font-family:var(--mono);
+}
+.chip small{display:block;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.chip b{font-size:20px;font-weight:600}
+nav.tabs{display:flex;gap:8px;margin:14px 0 10px}
+nav.tabs button{
+  flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);
+  background:var(--panel);color:var(--muted);font-size:15px;font-weight:600;cursor:pointer;
+}
+nav.tabs button[aria-selected="true"]{background:var(--copper);border-color:var(--copper);color:#1a1206}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;margin:6px 0 14px}
+.seg button{flex:1;padding:9px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-weight:600;font-size:14px;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 6px;font-size:15px;letter-spacing:.03em}
+.hint{color:var(--muted);font-size:13.5px;margin:0 0 8px}
+.svgbox{display:flex;justify-content:center;margin:6px 0}
+svg{max-width:100%;height:auto;display:block}
+.band{cursor:pointer}
+.band:hover{stroke:#fff;stroke-width:2}
+.lead{stroke:#9aa7b5;stroke-width:4;stroke-linecap:round}
+.wire{stroke:var(--line);stroke-width:3.5;fill:none;stroke-linecap:round;transition:stroke .15s}
+.wire.on{stroke:var(--signal);filter:drop-shadow(0 0 4px rgba(255,207,92,.7))}
+.gatebody{fill:var(--panel2);stroke:#7f92ad;stroke-width:2}
+.gatebody.tap{cursor:pointer}
+.gatebody.tap:hover{stroke:var(--copper)}
+.node{fill:var(--panel2);stroke:#7f92ad;stroke-width:2}
+.node.on{fill:var(--signal);stroke:var(--signal)}
+.led{fill:#33261a;stroke:#7f92ad;stroke-width:2}
+.led.on{fill:var(--signal);stroke:var(--signal);filter:drop-shadow(0 0 8px rgba(255,207,92,.9))}
+.svglabel{fill:var(--muted);font-family:var(--mono);font-size:13px}
+.svglabel.big{fill:var(--text);font-size:15px;font-weight:600}
+.rowbtns{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.rowbtns button, .btn{
+  padding:10px 14px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--text);font-size:14.5px;font-weight:600;cursor:pointer;
+}
+.rowbtns button[aria-pressed="true"]{border-color:var(--signal);color:var(--signal)}
+.btn.primary{background:var(--copper);border-color:var(--copper);color:#1a1206;width:100%;padding:13px;font-size:15px}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{width:100%;margin-top:10px;background:transparent;border-style:dashed;color:var(--muted)}
+.btn.ghost:disabled{opacity:.5;cursor:default}
+.hintbox{background:rgba(255,207,92,.08);border:1px dashed var(--signal);border-radius:10px;padding:9px 11px;font-size:14px;margin-top:8px}
+.task{font-size:15.5px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
+.spin{color:var(--muted);font-style:italic}
+.inrow{display:flex;gap:8px;margin-top:10px;align-items:center}
+input.txt{flex:1;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:var(--mono);font-size:16px}
+input.txt:focus{outline:2px solid var(--signal);outline-offset:1px}
+.unit{font-family:var(--mono);color:var(--muted);flex:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chips button{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer}
+.chips button[aria-selected="true"]{border-color:var(--copper);color:var(--copper)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.opts button{
+  padding:14px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--text);font-family:var(--mono);font-size:16px;cursor:pointer;
+}
+.opts button.ok{border-color:var(--ok);color:var(--ok)}
+.opts button.bad{border-color:var(--bad);color:var(--bad)}
+.opts button:disabled{opacity:.85}
+.expl{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.brow{display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0}
+.sw{width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.4);flex:none}
+.formula{font-family:var(--mono);font-size:15px;color:var(--signal);margin-top:8px;word-break:break-word}
+.feedback{font-weight:700;margin-top:10px;font-size:15px}
+.feedback.ok{color:var(--ok)} .feedback.bad{color:var(--bad)}
+table.tt{border-collapse:collapse;font-family:var(--mono);font-size:14px;width:100%;margin-top:8px}
+table.tt th,table.tt td{border:1px solid var(--line);padding:5px 4px;text-align:center}
+table.tt th{color:var(--muted);font-weight:600;font-size:12px}
+table.tt tr.cur td{background:rgba(255,207,92,.12)}
+td.hit{color:var(--ok)} td.miss{color:var(--bad)}
+.small{font-size:12.5px;color:var(--muted)}
+.progress{font-family:var(--mono);font-size:15px;margin-top:8px}
+.progress b{color:var(--signal)}
+:where(button):focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚡ Elektro <span>trenažér</span></h1>
+    <div class="meter">
+      <div class="chip"><small>Skóre</small><b id="score">0</b></div>
+      <div class="chip"><small>Série</small><b id="streak">0</b></div>
+      <div class="chip"><small>Úroveň</small><b id="level" style="font-size:14px">Učeň ⚡</b><span class="small" id="lvlNext" style="display:block"></span></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" style="flex-wrap:wrap">
+    <button id="tabR" role="tab" aria-selected="true" onclick="showTab('R')" style="font-size:13.5px;padding:11px 4px">Rezistory</button>
+    <button id="tabG" role="tab" aria-selected="false" onclick="showTab('G')" style="font-size:13.5px;padding:11px 4px">Hradla</button>
+    <button id="tabO" role="tab" aria-selected="false" onclick="showTab('O')" style="font-size:13.5px;padding:11px 4px">Ohm</button>
+    <button id="tabA" role="tab" aria-selected="false" onclick="showTab('A')" style="font-size:13.5px;padding:11px 4px">AI test</button>
+  </nav>
+
+  <!-- ==================== REZISTORY ==================== -->
+  <section id="secR">
+    <div class="seg" role="tablist">
+      <button id="segRL" aria-selected="true" onclick="showR('L')">📖 Nauč se</button>
+      <button id="segRQ" aria-selected="false" onclick="showR('Q')">🎯 Kvíz</button>
+    </div>
+
+    <div id="rezLearn">
+      <div class="card">
+        <h2>Jak číst barevné proužky</h2>
+        <p class="hint">Každý rezistor má na sobě barevný kód, který říká jeho odpor v ohmech (Ω).
+        <b>Klepni na kterýkoli proužek</b> a změň jeho barvu – dole uvidíš, co přesně znamená.</p>
+        <div class="chips">
+          <button id="lb4" aria-selected="true" onclick="setLearnCount(4)">4 proužky (běžné)</button>
+          <button id="lb5" aria-selected="false" onclick="setLearnCount(5)">5 proužků (přesné)</button>
+        </div>
+        <div class="svgbox" id="learnRes"></div>
+        <div id="learnInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Tahák: co znamenají barvy</h2>
+        <p class="hint">První proužky = číslice. Předposlední = násobitel (kolik nul přidat). Poslední = tolerance (přesnost).</p>
+        <div id="colorTable"></div>
+      </div>
+    </div>
+
+    <div id="rezQuiz" hidden>
+      <div class="card">
+        <h2>Poznej hodnotu rezistoru</h2>
+        <p class="hint">Přečti barevný kód a vyber správnou hodnotu. Za správnou odpověď je 10 bodů + bonus za sérii. Po odpovědi ti vždy ukážu <b>proužek po proužku</b>, jak se na to přišlo.</p>
+        <div class="chips">
+          <button id="qb4" aria-selected="true" onclick="setQuizCount(4)">4 proužky</button>
+          <button id="qb5" aria-selected="false" onclick="setQuizCount(5)">5 proužků</button>
+        </div>
+        <div class="svgbox" id="quizRes"></div>
+        <div class="opts" id="quizOpts"></div>
+        <button class="btn ghost" id="quizHintBtn" onclick="quizHint()">💡 Nápověda</button>
+        <div id="quizHints"></div>
+        <div id="quizFb"></div>
+        <div id="quizExpl"></div>
+        <button class="btn primary" id="quizNext" onclick="newQuiz()" hidden>Další rezistor ▸</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== HRADLA ==================== -->
+  <section id="secG" hidden>
+    <div class="seg" role="tablist">
+      <button id="segGL" aria-selected="true" onclick="showG('L')">📖 Nauč se</button>
+      <button id="segGB" aria-selected="false" onclick="showG('B')">🔧 Skládej</button>
+    </div>
+
+    <div id="gLearn">
+      <div class="card">
+        <h2>Logická hradla – stavební kameny počítačů</h2>
+        <p class="hint">Hradlo je součástka, která dostane na vstup jedničky a nuly (zapnuto/vypnuto) a podle svého typu vyrobí výstup. <b>Vyber hradlo a klepni na vstupy A / B</b> – sleduj, kdy se rozsvítí výstupní LED. Žlutý drát = teče v něm jednička.</p>
+        <div class="chips" id="gateChips"></div>
+        <div class="svgbox" id="gateCircuit"></div>
+        <div class="rowbtns" id="gateInputs"></div>
+        <p class="hint" id="gateDesc"></p>
+        <div id="gateTT"></div>
+        <p class="small">V pravdivostní tabulce svítí řádek, který právě máš nastavený.</p>
+      </div>
+    </div>
+
+    <div id="gBuild" hidden>
+      <div class="card">
+        <h2>Výzva: postav správný obvod</h2>
+        <p class="hint">Máš obvod se dvěma hradly. <b>Klepnutím na hradlo v obrázku</b> měníš jeho typ (AND → OR → XOR → NAND → NOR). Tvůj úkol: nastavit obě hradla tak, aby výstup odpovídal <b>cílové tabulce</b> pro všech 8 kombinací vstupů. Vstupy A, B, C si můžeš přepínat a zkoušet.</p>
+        <div class="svgbox" id="buildCircuit"></div>
+        <div class="rowbtns" id="buildInputs"></div>
+        <button class="btn ghost" id="buildHintBtn" onclick="buildHint()">💡 Nápověda</button>
+        <div id="buildHints"></div>
+        <div class="progress">Shoda s cílem: <b id="matchCount">0/8</b></div>
+        <div id="buildTT"></div>
+        <div id="buildFb"></div>
+        <button class="btn primary" id="buildNext" onclick="newChallenge()" hidden>Další výzva ▸</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== OHMŮV ZÁKON ==================== -->
+  <section id="secO" hidden>
+    <div class="card">
+      <h2>Ohmův zákon v akci</h2>
+      <p class="hint">Praktické výpočty, které vážně použiješ u nepájivého pole – bez nich LED shoří 🙂. Vyřešení = 12 bodů, nápověda −4, špatný pokus −3 (minimum vždy 2). Desetinná čárka i tečka jsou OK.</p>
+      <div class="task" id="ohmTask"></div>
+      <div class="inrow">
+        <input class="txt" id="ohmAnswer" inputmode="decimal" placeholder="Výsledek">
+        <span class="unit" id="ohmUnit"></span>
+        <button class="btn" onclick="checkOhm()">Ověřit</button>
+      </div>
+      <button class="btn ghost" id="ohmHintBtn" onclick="ohmHint()">💡 Nápověda</button>
+      <div id="ohmHints"></div>
+      <div id="ohmFb"></div>
+      <div id="ohmSteps"></div>
+      <div class="rowbtns"><button id="ohmGiveUp" onclick="giveUpOhm()">🏳️ Ukaž řešení (0 b.)</button></div>
+      <button class="btn primary" id="ohmNext" onclick="newOhm()" hidden>Další úloha ▸</button>
+    </div>
+    <div class="card">
+      <h2>Tahák vzorců</h2>
+      <div class="brow">U = I · R &nbsp;(napětí = proud × odpor)</div>
+      <div class="brow">I = U / R &nbsp;·&nbsp; R = U / I</div>
+      <div class="brow">P = U · I &nbsp;(výkon)</div>
+      <div class="brow">Sériově: odpory se sčítají</div>
+      <div class="brow">Paralelně (2 ks): R = R₁·R₂ / (R₁+R₂)</div>
+      <div class="brow small">Pozor na jednotky: 1 A = 1000 mA</div>
+    </div>
+  </section>
+
+  <!-- ==================== AI ZKOUŠEJÍCÍ ==================== -->
+  <section id="secA" hidden>
+    <div class="card">
+      <h2>AI zkoušející na přijímačky</h2>
+      <p class="hint">Skutečná umělá inteligence ti vymyslí úlohu, ohodnotí výsledek, a když se zasekneš, vysvětlí postup po krocích. Vyřešení = 15 bodů, každý odkrytý krok −4, špatný pokus −3 (minimum 2).</p>
+      <div class="chips">
+        <button id="ab78" aria-selected="true" onclick="setAiLevel('78')">7.–8. třída</button>
+        <button id="ab9" aria-selected="false" onclick="setAiLevel('9')">9. třída – přijímačky</button>
+      </div>
+      <button class="btn primary" id="aiNewBtn" onclick="newAiTask()">🎲 Nová úloha</button>
+      <div id="aiTask"></div>
+      <div class="inrow" id="aiAnswerRow" hidden>
+        <input class="txt" id="aiAnswer" inputmode="decimal" placeholder="Tvůj výsledek">
+        <span class="unit" id="aiUnit"></span>
+        <button class="btn" onclick="checkAi()">Ověřit</button>
+      </div>
+      <button class="btn ghost" id="aiHintBtn" onclick="aiHint()" hidden>💡 Ukaž další krok (−4 b.)</button>
+      <div id="aiHints"></div>
+      <div id="aiFb"></div>
+      <div id="aiSteps"></div>
+      <div class="rowbtns" id="aiEndRow" hidden><button onclick="giveUpAi()">🏳️ Ukaž celé řešení (0 b.)</button></div>
+      <button class="btn ghost" id="aiExplainBtn" onclick="aiExplain()" hidden>🤖 Vysvětli mi to ještě jednodušeji</button>
+      <div id="aiExplainOut"></div>
+    </div>
+    <div class="card">
+      <h2>Nastavení spojení</h2>
+      <p class="hint">Úlohy vymýšlí Claude přes náš vlastní server na Railway. Sem patří jeho adresa:</p>
+      <input class="txt" id="apiUrl" style="width:100%" placeholder="https://…up.railway.app" oninput="setApiUrl(this.value)">
+      <p class="small" id="aiStatus"></p>
+    </div>
+  </section>
+
+  <p class="small" style="text-align:center;margin-top:6px">Vyrobeno doma s tátou a AI 🤖</p>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+
+/* ---------- skóre ---------- */
+let score=0, streak=0;
+const LEVELS=[[0,'Učeň ⚡'],[100,'Bastlíř 🔧'],[250,'Technik 🔌'],[500,'Inženýr 📐'],[1000,'Mistr 🏆'],[2000,'Elektro guru 🧠']];
+function updScore(){
+  $('#score').textContent=score;
+  $('#streak').textContent=streak+(streak>=3?' 🔥':'');
+  let cur=LEVELS[0], next=null;
+  for(const l of LEVELS){ if(score>=l[0]) cur=l; else { next=l; break; } }
+  $('#level').textContent=cur[1];
+  $('#lvlNext').textContent = next ? 'další za '+(next[0]-score)+' b.' : 'maximum!';
+}
+async function saveScore(){ try{ if(window.storage){ await window.storage.set('elektro-trenazer', JSON.stringify({score,streak})); } }catch(e){} }
+async function loadScore(){ try{ if(window.storage){ const r=await window.storage.get('elektro-trenazer'); if(r&&r.value){ const d=JSON.parse(r.value); score=d.score||0; streak=d.streak||0; updScore(); } } }catch(e){} }
+function addPoints(p){ score+=p; streak++; updScore(); saveScore(); }
+function failStreak(){ streak=0; updScore(); saveScore(); }
+
+/* ---------- přepínání záložek ---------- */
+function showTab(t){
+  $('#secR').hidden = t!=='R'; $('#secG').hidden = t!=='G';
+  $('#secO').hidden = t!=='O'; $('#secA').hidden = t!=='A';
+  ['R','G','O','A'].forEach(x=>$('#tab'+x).setAttribute('aria-selected', t===x));
+  if(t==='O' && !ohm) newOhm();
+}
+function showR(m){
+  $('#rezLearn').hidden = m!=='L'; $('#rezQuiz').hidden = m!=='Q';
+  $('#segRL').setAttribute('aria-selected', m==='L'); $('#segRQ').setAttribute('aria-selected', m==='Q');
+  if(m==='Q' && !quiz) newQuiz();
+}
+function showG(m){
+  $('#gLearn').hidden = m!=='L'; $('#gBuild').hidden = m!=='B';
+  $('#segGL').setAttribute('aria-selected', m==='L'); $('#segGB').setAttribute('aria-selected', m==='B');
+}
+
+/* ==================== REZISTORY ==================== */
+const C={
+  cerna:   {h:'#1c1c1c', n:'černá',    d:0, m:1},
+  hneda:   {h:'#7a4526', n:'hnědá',    d:1, m:10,   t:1},
+  cervena: {h:'#c93434', n:'červená',  d:2, m:100,  t:2},
+  oranzova:{h:'#e07f2a', n:'oranžová', d:3, m:1000},
+  zluta:   {h:'#e6c22f', n:'žlutá',    d:4, m:10000},
+  zelena:  {h:'#3d8f4c', n:'zelená',   d:5, m:100000, t:0.5},
+  modra:   {h:'#3a63c0', n:'modrá',    d:6, m:1000000, t:0.25},
+  fialova: {h:'#8756c4', n:'fialová',  d:7, m:10000000, t:0.1},
+  seda:    {h:'#8d8d8d', n:'šedá',     d:8},
+  bila:    {h:'#efefef', n:'bílá',     d:9},
+  zlata:   {h:'#c79a2d', n:'zlatá',    m:0.1,  t:5},
+  stribrna:{h:'#c3c9cf', n:'stříbrná', m:0.01, t:10}
+};
+const DIG =['cerna','hneda','cervena','oranzova','zluta','zelena','modra','fialova','seda','bila'];
+const DIG1=DIG.slice(1);
+const MUL =['cerna','hneda','cervena','oranzova','zluta','zlata','stribrna'];
+const TOL =['hneda','cervena','zelena','modra','fialova','zlata','stribrna'];
+
+function czNum(x,dec){
+  const f=Math.pow(10,dec===undefined?2:dec);
+  let s=(Math.round(x*f)/f).toString();
+  return s.replace('.',',');
+}
+function fmtOhm(v){
+  if(v>=1e6) return czNum(v/1e6)+' MΩ';
+  if(v>=1e3) return czNum(v/1e3)+' kΩ';
+  return czNum(v)+' Ω';
+}
+function fmtMult(m){ return m<1 ? '×'+czNum(m) : '×'+m; }
+function resValue(bands){
+  const n=bands.length;
+  let base=0;
+  for(let i=0;i<n-2;i++) base=base*10+C[bands[i]].d;
+  return base*C[bands[n-2]].m;
+}
+function resistorSVG(bands, clickable, uid){
+  const n=bands.length;
+  const xs = n===4 ? [94,124,154,208] : [86,111,136,161,210];
+  let b='';
+  for(let i=0;i<n;i++){
+    b+='<rect x="'+xs[i]+'" y="20" width="15" height="50" rx="3" fill="'+C[bands[i]].h+'" stroke="rgba(0,0,0,.35)"'
+      +(clickable?' class="band" data-i="'+i+'" role="button" aria-label="proužek '+(i+1)+'"':'')+'/>';
+  }
+  return '<svg viewBox="0 0 320 90" width="320" aria-label="rezistor">'
+    +'<defs><linearGradient id="rb'+uid+'" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0" stop-color="#e3d3ae"/><stop offset=".5" stop-color="#cdb98c"/><stop offset="1" stop-color="#b09a6c"/>'
+    +'</linearGradient></defs>'
+    +'<line x1="8" y1="45" x2="66" y2="45" class="lead"/>'
+    +'<line x1="254" y1="45" x2="312" y2="45" class="lead"/>'
+    +'<rect x="62" y="17" width="196" height="56" rx="16" fill="url(#rb'+uid+')" stroke="rgba(0,0,0,.35)"/>'
+    +b+'</svg>';
+}
+function bandRoleNames(n){
+  return n===4 ? ['1. číslice','2. číslice','násobitel','tolerance']
+               : ['1. číslice','2. číslice','3. číslice','násobitel','tolerance'];
+}
+function breakdownHTML(bands){
+  const n=bands.length, roles=bandRoleNames(n);
+  let rows='', digits=[];
+  for(let i=0;i<n;i++){
+    const c=C[bands[i]];
+    let meaning;
+    if(i<n-2){ meaning='číslice <b>'+c.d+'</b>'; digits.push(c.d); }
+    else if(i===n-2){ meaning='násobitel <b>'+fmtMult(c.m)+'</b>'; }
+    else { meaning='tolerance <b>±'+czNum(c.t)+' %</b>'; }
+    rows+='<div class="brow"><span class="sw" style="background:'+c.h+'"></span>'
+        +(i+1)+'. proužek ('+roles[i]+') – '+c.n+' → '+meaning+'</div>';
+  }
+  const base=parseInt(digits.join(''),10);
+  const mult=C[bands[n-2]].m, tol=C[bands[n-1]].t;
+  const val=base*mult;
+  return rows
+    +'<div class="formula">'+digits.join(' ')+' → '+base+' '+fmtMult(mult)
+    +' = <b>'+fmtOhm(val)+'</b> ±'+czNum(tol)+' %</div>';
+}
+
+/* --- Nauč se: interaktivní rezistor --- */
+let learnCount=4;
+let learnBands=['cervena','fialova','hneda','zlata']; // 270 Ω
+function allowedFor(i){
+  const n=learnCount;
+  if(i===0) return DIG1;
+  if(i<n-2) return DIG;
+  if(i===n-2) return MUL;
+  return TOL;
+}
+function setLearnCount(n){
+  learnCount=n;
+  learnBands = n===4 ? ['cervena','fialova','hneda','zlata']
+                     : ['hneda','cerna','cerna','cervena','hneda']; // 10 kΩ ±1 %
+  $('#lb4').setAttribute('aria-selected', n===4);
+  $('#lb5').setAttribute('aria-selected', n===5);
+  renderLearn();
+}
+function renderLearn(){
+  $('#learnRes').innerHTML = resistorSVG(learnBands, true, 'L');
+  $('#learnRes').querySelectorAll('.band').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i=+el.dataset.i, a=allowedFor(i);
+      learnBands[i]=a[(a.indexOf(learnBands[i])+1)%a.length];
+      renderLearn();
+    });
+  });
+  $('#learnInfo').innerHTML = '<div class="expl">'+breakdownHTML(learnBands)+'</div>';
+}
+function renderColorTable(){
+  let rows='';
+  DIG.forEach(k=>{
+    const c=C[k];
+    rows+='<div class="brow"><span class="sw" style="background:'+c.h+'"></span>'
+      +c.n+' → číslice <b>'+c.d+'</b>'
+      +(c.m!==undefined?' · násobitel '+fmtMult(c.m):'')
+      +(c.t!==undefined?' · tolerance ±'+czNum(c.t)+' %':'')
+      +'</div>';
+  });
+  ['zlata','stribrna'].forEach(k=>{
+    const c=C[k];
+    rows+='<div class="brow"><span class="sw" style="background:'+c.h+'"></span>'
+      +c.n+' → násobitel '+fmtMult(c.m)+' · tolerance ±'+czNum(c.t)+' %</div>';
+  });
+  $('#colorTable').innerHTML=rows;
+}
+
+/* --- Kvíz --- */
+let quizCount=4, quiz=null, quizLock=false;
+function setQuizCount(n){
+  quizCount=n;
+  $('#qb4').setAttribute('aria-selected', n===4);
+  $('#qb5').setAttribute('aria-selected', n===5);
+  newQuiz();
+}
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+function randBands(n){
+  if(n===4) return [rnd(DIG1), rnd(DIG), rnd(MUL.slice(0,6)), rnd(['zlata','stribrna','hneda','cervena'])];
+  return [rnd(DIG1), rnd(DIG), rnd(DIG), rnd(MUL.slice(0,6)), rnd(['hneda','cervena','zelena','fialova'])];
+}
+function newQuiz(){
+  quiz={ bands:randBands(quizCount) };
+  quizLock=false;
+  const v=resValue(quiz.bands);
+  const keys=new Set([fmtOhm(v)]);
+  const opts=[{t:fmtOhm(v), ok:true}];
+  const tryAdd=x=>{
+    if(x<=0) return;
+    const f=fmtOhm(x);
+    if(!keys.has(f)){ keys.add(f); opts.push({t:f, ok:false}); }
+  };
+  // typické chyby: posunutý řád, prohozené číslice
+  tryAdd(v*10); tryAdd(v/10);
+  const n=quiz.bands.length;
+  const sw=quiz.bands.slice(); const tmp=sw[0]; sw[0]=sw[1]; sw[1]=tmp;
+  if(C[sw[0]].d!==0) tryAdd(resValue(sw));
+  let guard=0;
+  while(opts.length<4 && guard++<40){ tryAdd(resValue(randBands(n))); }
+  opts.sort(()=>Math.random()-0.5);
+  $('#quizRes').innerHTML = resistorSVG(quiz.bands, false, 'Q');
+  $('#quizOpts').innerHTML = opts.map((o,i)=>'<button data-ok="'+(o.ok?1:0)+'" onclick="answerQuiz(this)">'+o.t+'</button>').join('');
+  $('#quizFb').innerHTML=''; $('#quizExpl').innerHTML='';
+  $('#quizNext').hidden=true;
+  quizHintsUsed=0; $('#quizHints').innerHTML='';
+  $('#quizHintBtn').disabled=false;
+  updateQuizHintBtn(quizHintTexts().length);
+}
+function answerQuiz(btn){
+  if(quizLock) return;
+  quizLock=true;
+  const ok=btn.dataset.ok==='1';
+  document.querySelectorAll('#quizOpts button').forEach(b=>{
+    b.disabled=true;
+    if(b.dataset.ok==='1') b.classList.add('ok');
+  });
+  $('#quizHintBtn').disabled=true;
+  if(ok){
+    const bonus=Math.min(streak,5)*2;
+    const penalty=quizHintsUsed*3;
+    const earned=Math.max(1, 10+bonus-penalty);
+    addPoints(earned);
+    const detail=[];
+    if(bonus) detail.push('+'+bonus+' za sérii');
+    if(penalty) detail.push('−'+penalty+' za nápovědy');
+    $('#quizFb').innerHTML='<div class="feedback ok">✔ Správně! +'+earned+' bodů'+(detail.length?' ('+detail.join(', ')+')':'')+'</div>';
+  }else{
+    btn.classList.add('bad');
+    failStreak();
+    $('#quizFb').innerHTML='<div class="feedback bad">✘ Tentokrát ne. Mrkni níž, jak se to čte – příště to dáš!</div>';
+  }
+  $('#quizExpl').innerHTML='<div class="expl">'+breakdownHTML(quiz.bands)+'</div>';
+  $('#quizNext').hidden=false;
+}
+
+/* --- nápovědy kvízu --- */
+let quizHintsUsed=0;
+function quizHintTexts(){
+  const b=quiz.bands, n=b.length;
+  const t=[];
+  t.push('Čti zleva: '+(n===4?'první dva proužky jsou číslice':'první tři proužky jsou číslice')+', předposlední je násobitel a poslední tolerance. První proužek je '+C[b[0]].n+' → číslice '+C[b[0]].d+'.');
+  if(n===4){
+    t.push('Druhý proužek je '+C[b[1]].n+' → číslice '+C[b[1]].d+'. Základ čísla je tedy '+(C[b[0]].d*10+C[b[1]].d)+'.');
+  }else{
+    t.push('Druhý proužek: '+C[b[1]].n+' → '+C[b[1]].d+', třetí: '+C[b[2]].n+' → '+C[b[2]].d+'. Základ čísla je '+(C[b[0]].d*100+C[b[1]].d*10+C[b[2]].d)+'.');
+  }
+  t.push('Násobitel je '+C[b[n-2]].n+' → '+fmtMult(C[b[n-2]].m)+'. Vynásob základ násobitelem a máš výsledek.');
+  return t;
+}
+function updateQuizHintBtn(total){
+  const btn=$('#quizHintBtn');
+  if(quizHintsUsed>=total){ btn.disabled=true; btn.textContent='💡 Víc nápověd už není'; }
+  else btn.textContent='💡 Nápověda '+(quizHintsUsed+1)+'/'+total+' (−3 b.)';
+}
+function quizHint(){
+  if(quizLock||!quiz) return;
+  const texts=quizHintTexts();
+  if(quizHintsUsed>=texts.length) return;
+  const div=document.createElement('div');
+  div.className='hintbox';
+  div.textContent='💡 '+texts[quizHintsUsed];
+  $('#quizHints').appendChild(div);
+  quizHintsUsed++;
+  updateQuizHintBtn(texts.length);
+}
+
+/* ==================== HRADLA ==================== */
+const GATE_FN={
+  AND :(a,b)=>a&&b,
+  OR  :(a,b)=>a||b?1:0,
+  NOT :(a)=>a?0:1,
+  XOR :(a,b)=>a!==b?1:0,
+  NAND:(a,b)=>a&&b?0:1,
+  NOR :(a,b)=>a||b?0:1
+};
+const GATE_DESC={
+  AND :'AND = „a zároveň". Výstup je 1 jen tehdy, když jsou OBA vstupy 1. Představ si dva vypínače zapojené za sebou – proud projde, jen když jsou zapnuté oba.',
+  OR  :'OR = „nebo". Výstup je 1, když je aspoň JEDEN vstup 1. Dva vypínače vedle sebe – stačí zapnout kterýkoli.',
+  NOT :'NOT = invertor. Prostě obrací signál: z 1 udělá 0 a z 0 udělá 1. Má jen jeden vstup.',
+  XOR :'XOR = „právě jeden". Výstup je 1, když se vstupy LIŠÍ. Přesně takhle fungují schodišťové vypínače – světlo přepneš z obou konců schodiště.',
+  NAND:'NAND = obrácený AND. Výstup je 0, jen když jsou oba vstupy 1. Zajímavost: jen z NAND hradel se dá postavit celý počítač!',
+  NOR :'NOR = obrácený OR. Výstup je 1, jen když jsou oba vstupy 0.'
+};
+/* tvar hradla: vrací {svg, outX} – kresleno v lokálních souřadnicích 0,0–~70,40, vstupy na y 10 a 30 (NOT y 20) */
+function gateShape(type, tap, label){
+  const cls='gatebody'+(tap?' tap':'');
+  const attr=tap?' data-gate="'+tap+'"':'';
+  let body='', outX=50;
+  if(type==='AND'||type==='NAND'){
+    body='<path class="'+cls+'"'+attr+' d="M0,0 H30 A20,20 0 0 1 30,40 H0 Z"/>'; outX=50;
+  }else if(type==='OR'||type==='NOR'||type==='XOR'){
+    body='<path class="'+cls+'"'+attr+' d="M2,0 Q20,2 34,8 Q54,15 62,20 Q54,25 34,32 Q20,38 2,40 Q12,20 2,0 Z"/>'; outX=62;
+    if(type==='XOR') body='<path class="wire" style="stroke:#7f92ad;stroke-width:2" d="M-5,0 Q5,20 -5,40"/>'+body;
+  }else if(type==='NOT'){
+    body='<path class="'+cls+'"'+attr+' d="M0,2 L38,20 L0,38 Z"/>'; outX=38;
+  }
+  if(type==='NAND'||type==='NOR'||type==='NOT'){
+    body+='<circle class="'+cls+'"'+attr+' cx="'+(outX+5)+'" cy="20" r="5"/>'; outX+=10;
+  }
+  body+='<text class="svglabel big" x="'+(type==='NOT'?10:16)+'" y="25" pointer-events="none">'+(label||type)+'</text>';
+  return {svg:body, outX:outX};
+}
+function w(x1,y1,x2,y2,on){ return '<path class="wire'+(on?' on':'')+'" d="M'+x1+','+y1+' L'+x2+','+y2+'"/>'; }
+function wPath(d,on){ return '<path class="wire'+(on?' on':'')+'" d="'+d+'"/>'; }
+function nodeC(x,y,val,letter){
+  return '<circle class="node'+(val?' on':'')+'" cx="'+x+'" cy="'+y+'" r="9"/>'
+       +'<text class="svglabel" x="'+(x-28)+'" y="'+(y+5)+'">'+letter+'='+val+'</text>';
+}
+function ledC(x,y,val){
+  return '<circle class="led'+(val?' on':'')+'" cx="'+x+'" cy="'+y+'" r="10"/>'
+       +'<text class="svglabel" x="'+(x-14)+'" y="'+(y+26)+'">OUT='+val+'</text>';
+}
+
+/* --- Nauč se --- */
+let gl={type:'AND', a:0, b:0};
+function renderGateChips(){
+  $('#gateChips').innerHTML = Object.keys(GATE_FN).map(t=>
+    '<button aria-selected="'+(gl.type===t)+'" onclick="setGate(\''+t+'\')">'+t+'</button>').join('');
+}
+function setGate(t){ gl.type=t; renderLearnGate(); }
+function renderLearnGate(){
+  renderGateChips();
+  const isNot = gl.type==='NOT';
+  const g=gateShape(gl.type,null,null);
+  const out = isNot ? GATE_FN.NOT(gl.a) : GATE_FN[gl.type](gl.a, gl.b);
+  const gx=140, gy=30;
+  let s='<svg viewBox="0 0 340 120" width="340" aria-label="obvod s hradlem">';
+  if(isNot){
+    s+=w(58,60,gx,60,gl.a)+nodeC(48,60,gl.a,'A');
+    s+='<g transform="translate('+gx+','+(gy+10)+')">'+g.svg+'</g>';
+    s+=w(gx+g.outX,60,290,60,out)+ledC(300,60,out);
+  }else{
+    s+=w(58,40,gx,40,gl.a)+w(58,80,gx,80,gl.b);
+    s+=nodeC(48,40,gl.a,'A')+nodeC(48,80,gl.b,'B');
+    s+='<g transform="translate('+gx+','+gy+')">'+g.svg.replace(/y 10 a 30/,'')+'</g>';
+    /* vstupy hradla jsou v lokále na y10/y30 => absolutně y40/y60; dorovnáme drát B */
+    s=s.replace(w(58,80,gx,80,gl.b), wPath('M58,80 H100 V60 H'+gx, gl.b));
+    s+=w(gx+g.outX,50,290,50,out)+ledC(300,50,out);
+  }
+  s+='</svg>';
+  $('#gateCircuit').innerHTML=s;
+  let btns='<button aria-pressed="'+(gl.a?'true':'false')+'" onclick="gl.a^=1;renderLearnGate()">Vstup A: '+gl.a+'</button>';
+  if(!isNot) btns+='<button aria-pressed="'+(gl.b?'true':'false')+'" onclick="gl.b^=1;renderLearnGate()">Vstup B: '+gl.b+'</button>';
+  $('#gateInputs').innerHTML=btns;
+  $('#gateDesc').textContent=GATE_DESC[gl.type];
+  // pravdivostní tabulka
+  let tt='<table class="tt"><tr>'+(isNot?'<th>A</th>':'<th>A</th><th>B</th>')+'<th>Výstup</th></tr>';
+  if(isNot){
+    for(let a=0;a<=1;a++){
+      tt+='<tr'+(a===gl.a?' class="cur"':'')+'><td>'+a+'</td><td>'+GATE_FN.NOT(a)+'</td></tr>';
+    }
+  }else{
+    for(let a=0;a<=1;a++)for(let b=0;b<=1;b++){
+      tt+='<tr'+((a===gl.a&&b===gl.b)?' class="cur"':'')+'><td>'+a+'</td><td>'+b+'</td><td>'+GATE_FN[gl.type](a,b)+'</td></tr>';
+    }
+  }
+  $('#gateTT').innerHTML=tt+'</table>';
+}
+
+/* --- Skládej --- */
+const G2=['AND','OR','XOR','NAND','NOR'];
+let bld={g1:'AND', g2:'OR', a:0,b:0,c:0, t1:null,t2:null, solved:false};
+function tableFor(g1,g2){
+  const out=[];
+  for(let a=0;a<=1;a++)for(let b=0;b<=1;b++)for(let c=0;c<=1;c++){
+    out.push(GATE_FN[g2](GATE_FN[g1](a,b), c));
+  }
+  return out;
+}
+function sameTable(x,y){ return x.every((v,i)=>v===y[i]); }
+function newChallenge(){
+  let guard=0;
+  do{
+    bld.t1=rnd(G2); bld.t2=rnd(G2);
+  }while(guard++<20 && sameTable(tableFor(bld.t1,bld.t2), tableFor(bld.g1,bld.g2)));
+  bld.solved=false;
+  bldHintsUsed=0; $('#buildHints').innerHTML='';
+  const hb=$('#buildHintBtn'); hb.disabled=false; hb.textContent='💡 Nápověda 1/3 (−7 b.)';
+  $('#buildFb').innerHTML=''; $('#buildNext').hidden=true;
+  renderBuild();
+}
+let bldHintsUsed=0;
+function buildHintTexts(){
+  const target=tableFor(bld.t1,bld.t2);
+  const t=[];
+  t.push('Strategie: řádek A=1, B=1, C=1 hodně napoví o hradle 2 – cílový výstup je pro něj '+target[7]+'. Zkus nejdřív měnit jen hradlo 2 a sleduj, kolik řádků sedí.');
+  t.push('Jedno z možných řešení má jako hradlo 1 typ '+bld.t1+'. (Počítá se shoda celé tabulky, takže někdy funguje i jiná kombinace.)');
+  t.push('A hradlo 2 je v tomto řešení '+bld.t2+'. Nastav obě hradla a zkontroluj všech 8 řádků.');
+  return t;
+}
+function buildHint(){
+  if(bld.solved) return;
+  const texts=buildHintTexts();
+  if(bldHintsUsed>=texts.length) return;
+  const div=document.createElement('div');
+  div.className='hintbox';
+  div.textContent='💡 '+texts[bldHintsUsed];
+  $('#buildHints').appendChild(div);
+  bldHintsUsed++;
+  const btn=$('#buildHintBtn');
+  if(bldHintsUsed>=texts.length){ btn.disabled=true; btn.textContent='💡 Víc nápověd už není'; }
+  else btn.textContent='💡 Nápověda '+(bldHintsUsed+1)+'/'+texts.length+' (−7 b.)';
+}
+function cycleGate(which){
+  if(bld.solved) return;
+  const cur=which===1?bld.g1:bld.g2;
+  const nxt=G2[(G2.indexOf(cur)+1)%G2.length];
+  if(which===1) bld.g1=nxt; else bld.g2=nxt;
+  renderBuild();
+}
+function renderBuild(){
+  const v1=GATE_FN[bld.g1](bld.a,bld.b);
+  const out=GATE_FN[bld.g2](v1,bld.c);
+  const s1=gateShape(bld.g1,'1',bld.g1), s2=gateShape(bld.g2,'2',bld.g2);
+  const g1x=110,g1y=20, g2x=210,g2y=90;
+  let s='<svg viewBox="0 0 340 190" width="340" aria-label="obvod se dvěma hradly">';
+  s+=w(50,30,g1x,30,bld.a);
+  s+=wPath('M50,60 H80 V50 H'+g1x, bld.b);
+  s+=nodeC(40,30,bld.a,'A')+nodeC(40,60,bld.b,'B');
+  s+='<g transform="translate('+g1x+','+g1y+')">'+s1.svg+'</g>';
+  s+=wPath('M'+(g1x+s1.outX)+',40 H190 V100 H'+g2x, v1);
+  s+=wPath('M50,120 H'+g2x, bld.c);
+  s+=nodeC(40,120,bld.c,'C');
+  s+='<g transform="translate('+g2x+','+g2y+')">'+s2.svg+'</g>';
+  s+=w(g2x+s2.outX,110,308,110,out);
+  s+=ledC(318,110,out);
+  s+='<text class="svglabel" x="'+(g1x)+'" y="14">↻ klepni</text>';
+  s+='<text class="svglabel" x="'+(g2x)+'" y="84">↻ klepni</text>';
+  s+='</svg>';
+  $('#buildCircuit').innerHTML=s;
+  $('#buildCircuit').querySelectorAll('[data-gate]').forEach(el=>{
+    el.addEventListener('click', ()=>cycleGate(+el.dataset.gate));
+  });
+  $('#buildInputs').innerHTML=
+    '<button aria-pressed="'+(bld.a?'true':'false')+'" onclick="bld.a^=1;renderBuild()">A: '+bld.a+'</button>'+
+    '<button aria-pressed="'+(bld.b?'true':'false')+'" onclick="bld.b^=1;renderBuild()">B: '+bld.b+'</button>'+
+    '<button aria-pressed="'+(bld.c?'true':'false')+'" onclick="bld.c^=1;renderBuild()">C: '+bld.c+'</button>';
+  // porovnání s cílem
+  const target=tableFor(bld.t1,bld.t2);
+  const mine=tableFor(bld.g1,bld.g2);
+  let hits=0, rows='', i=0;
+  for(let a=0;a<=1;a++)for(let b=0;b<=1;b++)for(let c=0;c<=1;c++){
+    const hit=mine[i]===target[i]; if(hit)hits++;
+    const cur=(a===bld.a&&b===bld.b&&c===bld.c);
+    rows+='<tr'+(cur?' class="cur"':'')+'><td>'+a+'</td><td>'+b+'</td><td>'+c+'</td>'
+        +'<td>'+target[i]+'</td><td class="'+(hit?'hit':'miss')+'">'+mine[i]+' '+(hit?'✓':'✗')+'</td></tr>';
+    i++;
+  }
+  $('#buildTT').innerHTML='<table class="tt"><tr><th>A</th><th>B</th><th>C</th><th>Cíl</th><th>Tvůj obvod</th></tr>'+rows+'</table>';
+  $('#matchCount').textContent=hits+'/8';
+  if(hits===8 && !bld.solved){
+    bld.solved=true;
+    const penalty=bldHintsUsed*7;
+    const earned=Math.max(4, 25-penalty);
+    addPoints(earned);
+    $('#buildHintBtn').disabled=true;
+    $('#buildFb').innerHTML='<div class="feedback ok">✔ Vyřešeno! Obvod dělá přesně to, co má. +'+earned+' bodů'+(penalty?' (−'+penalty+' za nápovědy)':'')+'</div>';
+    $('#buildNext').hidden=false;
+  }
+}
+
+/* ==================== OHMŮV ZÁKON ==================== */
+function parseNum(s){ if(s==null) return NaN; return parseFloat(String(s).trim().replace(/\s/g,'').replace(',','.')); }
+function isClose(u,a){ return Math.abs(u-a)<=Math.max(Math.abs(a)*0.02,0.01); }
+
+const OHM_GEN=[
+  function(){ const R=rnd([100,150,220,330,470,1000]), Im=rnd([5,10,20,50]), U=R*Im/1000;
+    return {q:'Rezistorem o odporu R = '+R+' Ω teče proud I = '+Im+' mA. Jak velké napětí U naměříš na rezistoru?',
+      ans:U, unit:'V',
+      hints:['Ohmův zákon: U = I · R. Proud je ale v miliampérech – nejdřív ho převeď na ampéry ('+Im+' mA = '+czNum(Im/1000,3)+' A).',
+             'Dosaď: U = '+czNum(Im/1000,3)+' A × '+R+' Ω a vynásob.'],
+      steps:['Převod: I = '+Im+' mA = '+czNum(Im/1000,3)+' A','U = I · R = '+czNum(Im/1000,3)+' × '+R+' = '+czNum(U)+' V']}; },
+  function(){ const U=rnd([5,9,12,24]), R=rnd([100,200,300,400,500,600,1000,1200]), I=Math.round(U/R*100000)/100;
+    return {q:'Na rezistoru R = '+R+' Ω je napětí U = '+U+' V. Jaký proud I jím teče? Výsledek zadej v mA.',
+      ans:I, unit:'mA',
+      hints:['Ohmův zákon obráceně: I = U / R. Vyjde v ampérech – na miliampéry vynásob tisícem.',
+             'Dosaď: I = '+U+' / '+R+' A, potom × 1000.'],
+      steps:['I = U / R = '+U+' / '+R+' = '+czNum(U/R,4)+' A','Převod: '+czNum(U/R,4)+' A × 1000 = '+czNum(I)+' mA']}; },
+  function(){ const Ub=rnd([5,9,12]), Uled=rnd([1.8,2,3.2]), Im=rnd([10,15,20]), R=Math.round((Ub-Uled)/(Im/1000));
+    return {q:'LED má úbytek napětí '+czNum(Uled)+' V a snese proud '+Im+' mA. Napájíš ji z baterie '+Ub+' V. Jak velký předřadný rezistor R potřebuješ? (Zaokrouhli na celé ohmy.)',
+      ans:R, unit:'Ω',
+      hints:['Na rezistoru zbyde napětí baterie minus úbytek LED: U_R = '+Ub+' − '+czNum(Uled)+' V. A pak Ohmův zákon: R = U_R / I.',
+             'Dosaď: R = '+czNum(Ub-Uled)+' / '+czNum(Im/1000,3)+'.'],
+      steps:['U_R = '+Ub+' − '+czNum(Uled)+' = '+czNum(Ub-Uled)+' V','I = '+Im+' mA = '+czNum(Im/1000,3)+' A','R = U_R / I = '+czNum(Ub-Uled)+' / '+czNum(Im/1000,3)+' = '+R+' Ω']}; },
+  function(){ const U=rnd([5,9,12,24]), Im=rnd([100,200,250,500]), P=U*Im/1000;
+    return {q:'Zařízení napájené napětím '+U+' V odebírá proud '+Im+' mA. Jaký má příkon P?',
+      ans:P, unit:'W',
+      hints:['Výkon: P = U · I. Proud nejdřív převeď na ampéry.','P = '+U+' × '+czNum(Im/1000,3)+'.'],
+      steps:['I = '+Im+' mA = '+czNum(Im/1000,3)+' A','P = U · I = '+U+' × '+czNum(Im/1000,3)+' = '+czNum(P)+' W']}; },
+  function(){ const r=[rnd([100,220,330]),rnd([470,560,680]),rnd([1000,1500])], R=r[0]+r[1]+r[2];
+    return {q:'Tři rezistory '+r[0]+' Ω, '+r[1]+' Ω a '+r[2]+' Ω jsou zapojené za sebou (sériově). Jaký je celkový odpor?',
+      ans:R, unit:'Ω',
+      hints:['V sérii se odpory prostě sčítají: R = R₁ + R₂ + R₃.','R = '+r.join(' + ')+'.'],
+      steps:['R = '+r.join(' + ')+' = '+R+' Ω']}; },
+  function(){ const p=rnd([[100,100],[220,220],[1000,1000],[300,600],[600,300],[400,400],[200,300]]);
+    const R=Math.round(p[0]*p[1]/(p[0]+p[1])*100)/100;
+    return {q:'Dva rezistory '+p[0]+' Ω a '+p[1]+' Ω jsou zapojené vedle sebe (paralelně). Jaký je výsledný odpor?',
+      ans:R, unit:'Ω',
+      hints:['Pro dva paralelní rezistory platí: R = (R₁ · R₂) / (R₁ + R₂). U dvou stejných je to přesně polovina.',
+             'R = ('+p[0]+' × '+p[1]+') / ('+p[0]+' + '+p[1]+').'],
+      steps:['R = ('+p[0]+' × '+p[1]+') / ('+p[0]+' + '+p[1]+') = '+(p[0]*p[1])+' / '+(p[0]+p[1])+' = '+czNum(R)+' Ω']}; }
+];
+let ohm=null;
+function newOhm(){
+  ohm=Object.assign(rnd(OHM_GEN)(), {hintsUsed:0, wrong:0, done:false});
+  $('#ohmTask').textContent=ohm.q;
+  $('#ohmUnit').textContent=ohm.unit;
+  $('#ohmAnswer').value=''; $('#ohmAnswer').disabled=false;
+  $('#ohmHints').innerHTML=''; $('#ohmFb').innerHTML=''; $('#ohmSteps').innerHTML='';
+  const hb=$('#ohmHintBtn'); hb.disabled=false; hb.textContent='💡 Nápověda 1/'+ohm.hints.length+' (−4 b.)';
+  $('#ohmGiveUp').disabled=false;
+  $('#ohmNext').hidden=true;
+}
+function ohmHint(){
+  if(!ohm||ohm.done) return;
+  if(ohm.hintsUsed>=ohm.hints.length) return;
+  const div=document.createElement('div'); div.className='hintbox';
+  div.textContent='💡 '+ohm.hints[ohm.hintsUsed];
+  $('#ohmHints').appendChild(div);
+  ohm.hintsUsed++;
+  const hb=$('#ohmHintBtn');
+  if(ohm.hintsUsed>=ohm.hints.length){ hb.disabled=true; hb.textContent='💡 Víc nápověd už není'; }
+  else hb.textContent='💡 Nápověda '+(ohm.hintsUsed+1)+'/'+ohm.hints.length+' (−4 b.)';
+}
+function ohmStepsHTML(){
+  return '<div class="expl">'+ohm.steps.map(s=>'<div class="brow">▸ '+s+'</div>').join('')+'</div>';
+}
+function finishOhm(){
+  ohm.done=true;
+  $('#ohmAnswer').disabled=true; $('#ohmHintBtn').disabled=true; $('#ohmGiveUp').disabled=true;
+  $('#ohmSteps').innerHTML=ohmStepsHTML();
+  $('#ohmNext').hidden=false;
+}
+function checkOhm(){
+  if(!ohm||ohm.done) return;
+  const u=parseNum($('#ohmAnswer').value);
+  if(isNaN(u)){ $('#ohmFb').innerHTML='<div class="feedback bad">Zadej výsledek jako číslo.</div>'; return; }
+  if(isClose(u,ohm.ans)){
+    const bonus=Math.min(streak,5)*2;
+    const penalty=ohm.hintsUsed*4+ohm.wrong*3;
+    const earned=Math.max(2, 12+bonus-penalty);
+    addPoints(earned);
+    const detail=[]; if(bonus)detail.push('+'+bonus+' za sérii'); if(penalty)detail.push('−'+penalty+' za nápovědy/pokusy');
+    $('#ohmFb').innerHTML='<div class="feedback ok">✔ Přesně tak! +'+earned+' bodů'+(detail.length?' ('+detail.join(', ')+')':'')+'</div>';
+    finishOhm();
+  }else{
+    ohm.wrong++;
+    $('#ohmFb').innerHTML='<div class="feedback bad">✘ Ještě ne – zkontroluj jednotky a zkus to znovu (−3 b. z odměny).</div>';
+  }
+}
+function giveUpOhm(){
+  if(!ohm||ohm.done) return;
+  failStreak();
+  $('#ohmFb').innerHTML='<div class="feedback bad">Správný výsledek: '+czNum(ohm.ans)+' '+ohm.unit+'. Projdi si postup a další úlohu už dáš!</div>';
+  finishOhm();
+}
+
+/* ==================== AI ZKOUŠEJÍCÍ ==================== */
+let API_URL='';  // ← sem po nasazení backendu vlož adresu Railway služby, např. 'https://elektro-ai.up.railway.app'
+let aiLevel='78', ai=null, aiBusy=false;
+function esc(s){ return String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function setApiUrl(v){ API_URL=v.trim(); try{ if(window.storage) window.storage.set('elektro-api-url', API_URL); }catch(e){} }
+function setAiLevel(l){
+  aiLevel=l;
+  $('#ab78').setAttribute('aria-selected', l==='78');
+  $('#ab9').setAttribute('aria-selected', l==='9');
+}
+function aiBase(){ return (API_URL||$('#apiUrl').value.trim()).replace(/\/+$/,''); }
+async function newAiTask(){
+  if(aiBusy) return;
+  const base=aiBase();
+  $('#aiHints').innerHTML=''; $('#aiFb').innerHTML=''; $('#aiSteps').innerHTML=''; $('#aiExplainOut').innerHTML='';
+  $('#aiAnswerRow').hidden=true; $('#aiHintBtn').hidden=true; $('#aiEndRow').hidden=true; $('#aiExplainBtn').hidden=true;
+  if(!base){
+    $('#aiTask').innerHTML='<div class="task">⚠️ Nejdřív vyplň adresu AI serveru v nastavení dole na stránce.</div>';
+    return;
+  }
+  aiBusy=true; $('#aiNewBtn').disabled=true;
+  $('#aiTask').innerHTML='<div class="task spin">🤖 AI vymýšlí úlohu…</div>';
+  try{
+    const r=await fetch(base+'/api/uloha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({obtiznost:aiLevel})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    ai={zadani:d.zadani||'', vysledek:d.vysledek, jednotka:d.jednotka||'', kroky:Array.isArray(d.kroky)?d.kroky:[], hintsUsed:0, wrong:0, done:false};
+    $('#aiTask').innerHTML='<div class="task">'+esc(ai.zadani)+'</div>';
+    $('#aiUnit').textContent=ai.jednotka;
+    $('#aiAnswer').value=''; $('#aiAnswer').disabled=false;
+    $('#aiAnswerRow').hidden=false; $('#aiEndRow').hidden=false;
+    const maxH=Math.max(ai.kroky.length-1,0);
+    const hb=$('#aiHintBtn');
+    if(maxH>0){ hb.hidden=false; hb.disabled=false; hb.textContent='💡 Ukaž krok 1/'+maxH+' (−4 b.)'; }
+    $('#aiStatus').textContent='✔ Spojení s AI serverem funguje.';
+  }catch(e){
+    $('#aiTask').innerHTML='<div class="task">⚠️ Nepodařilo se spojit s AI serverem ('+esc(e.message)+'). Zkontroluj adresu v nastavení a jestli server na Railway běží.</div>';
+  }
+  aiBusy=false; $('#aiNewBtn').disabled=false;
+}
+function aiHint(){
+  if(!ai||ai.done) return;
+  const maxH=Math.max(ai.kroky.length-1,0);
+  if(ai.hintsUsed>=maxH) return;
+  const div=document.createElement('div'); div.className='hintbox';
+  div.textContent='💡 Krok '+(ai.hintsUsed+1)+': '+ai.kroky[ai.hintsUsed];
+  $('#aiHints').appendChild(div);
+  ai.hintsUsed++;
+  const hb=$('#aiHintBtn');
+  if(ai.hintsUsed>=maxH){ hb.disabled=true; hb.textContent='💡 Zbývá už jen poslední krok s výsledkem'; }
+  else hb.textContent='💡 Ukaž krok '+(ai.hintsUsed+1)+'/'+maxH+' (−4 b.)';
+}
+function aiStepsHTML(){
+  return '<div class="expl">'+ai.kroky.map(s=>'<div class="brow">▸ '+esc(s)+'</div>').join('')+'</div>';
+}
+function aiMatch(userStr){
+  const a=parseNum(ai.vysledek), u=parseNum(userStr);
+  if(!isNaN(a)&&!isNaN(u)) return isClose(u,a);
+  const norm=s=>String(s).toLowerCase().replace(/\s/g,'').replace(',','.');
+  return norm(userStr)===norm(ai.vysledek);
+}
+function finishAi(){
+  ai.done=true;
+  $('#aiAnswer').disabled=true; $('#aiHintBtn').disabled=true; $('#aiEndRow').hidden=true;
+  $('#aiSteps').innerHTML=aiStepsHTML();
+  $('#aiExplainBtn').hidden=false;
+}
+function checkAi(){
+  if(!ai||ai.done) return;
+  const v=$('#aiAnswer').value;
+  if(!v.trim()){ $('#aiFb').innerHTML='<div class="feedback bad">Napiš svůj výsledek.</div>'; return; }
+  if(aiMatch(v)){
+    const bonus=Math.min(streak,5)*2;
+    const penalty=ai.hintsUsed*4+ai.wrong*3;
+    const earned=Math.max(2, 15+bonus-penalty);
+    addPoints(earned);
+    const detail=[]; if(bonus)detail.push('+'+bonus+' za sérii'); if(penalty)detail.push('−'+penalty+' za nápovědy/pokusy');
+    $('#aiFb').innerHTML='<div class="feedback ok">✔ Správně! +'+earned+' bodů'+(detail.length?' ('+detail.join(', ')+')':'')+'</div>';
+    finishAi();
+  }else{
+    ai.wrong++;
+    $('#aiFb').innerHTML='<div class="feedback bad">✘ Ještě ne – zkus to znovu (−3 b. z odměny). Tip: zkontroluj, jestli AI nechce výsledek v jiné jednotce.</div>';
+  }
+}
+function giveUpAi(){
+  if(!ai||ai.done) return;
+  failStreak();
+  $('#aiFb').innerHTML='<div class="feedback bad">Správný výsledek: '+esc(ai.vysledek)+' '+esc(ai.jednotka)+'. Projdi si postup níže.</div>';
+  finishAi();
+}
+async function aiExplain(){
+  if(!ai||aiBusy) return;
+  const base=aiBase(); if(!base) return;
+  aiBusy=true; const b=$('#aiExplainBtn'); b.disabled=true;
+  $('#aiExplainOut').innerHTML='<div class="task spin">🤖 AI přemýšlí, jak to říct jednodušeji…</div>';
+  try{
+    const r=await fetch(base+'/api/vysvetli',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zadani:ai.zadani, kroky:ai.kroky, uroven:aiLevel})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    $('#aiExplainOut').innerHTML='<div class="hintbox">🤖 '+esc(d.text||'').replace(/\n/g,'<br>')+'</div>';
+  }catch(e){
+    $('#aiExplainOut').innerHTML='<div class="task">⚠️ Vysvětlení se nepodařilo načíst ('+esc(e.message)+').</div>';
+  }
+  aiBusy=false; b.disabled=false;
+}
+async function loadApiUrl(){
+  try{
+    if(window.storage){
+      const r=await window.storage.get('elektro-api-url');
+      if(r&&r.value){ API_URL=r.value; }
+    }
+  }catch(e){}
+  $('#apiUrl').value=API_URL;
+}
+
+/* ---------- start ---------- */
+renderLearn();
+renderColorTable();
+renderLearnGate();
+newChallenge();
+newOhm();
+loadApiUrl();
+loadScore();
+</script>
+</body>
+</html>
