@@ -263,7 +263,7 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
       <button class="btn ghost" id="aiExplainBtn" onclick="aiExplain()" hidden>🤖 Vysvětli mi to ještě jednodušeji</button>
       <div id="aiExplainOut"></div>
     </div>
-    <div class="card">
+    <div class="card" hidden>
       <h2>Nastavení spojení</h2>
       <p class="hint">Úlohy vymýšlí Claude přes náš vlastní server na Railway. Sem patří jeho adresa:</p>
       <input class="txt" id="apiUrl" style="width:100%" placeholder="https://…up.railway.app" oninput="setApiUrl(this.value)">
