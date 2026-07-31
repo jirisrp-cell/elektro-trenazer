@@ -81,6 +81,8 @@ svg{max-width:100%;height:auto;display:block}
 input.txt{flex:1;min-width:0;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:var(--mono);font-size:16px}
 input.txt:focus{outline:2px solid var(--signal);outline-offset:1px}
 .unit{font-family:var(--mono);color:var(--muted);flex:none}
+.dpos{fill:var(--muted);font-family:var(--mono);font-size:11.5px;cursor:pointer}
+.dpos.dsel{fill:var(--signal);font-weight:700}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .chips button{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer}
 .chips button[aria-selected="true"]{border-color:var(--copper);color:var(--copper)}
@@ -127,6 +129,7 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
     <button id="tabG" role="tab" aria-selected="false" onclick="showTab('G')" style="font-size:13.5px;padding:11px 4px">Hradla</button>
     <button id="tabO" role="tab" aria-selected="false" onclick="showTab('O')" style="font-size:13.5px;padding:11px 4px">Ohm</button>
     <button id="tabA" role="tab" aria-selected="false" onclick="showTab('A')" style="font-size:13.5px;padding:11px 4px">AI test</button>
+    <button id="tabD" role="tab" aria-selected="false" onclick="showTab('D')" style="font-size:13.5px;padding:11px 4px">Dílna</button>
   </nav>
 
   <!-- ==================== REZISTORY ==================== -->
@@ -271,6 +274,123 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
     </div>
   </section>
 
+  <!-- ==================== DÍLNA ==================== -->
+  <section id="secD" hidden>
+    <div class="chips" id="dMods" style="margin-bottom:12px">
+      <button data-m="Led" aria-selected="true" onclick="showD('Led')">💡 LED</button>
+      <button data-m="Dio" aria-selected="false" onclick="showD('Dio')">⏄ Dioda</button>
+      <button data-m="MR" aria-selected="false" onclick="showD('MR')">🔧 Měř R</button>
+      <button data-m="ML" aria-selected="false" onclick="showD('ML')">🔦 Měř LED</button>
+      <button data-m="SP" aria-selected="false" onclick="showD('SP')">🔗 Sér × Par</button>
+    </div>
+
+    <div id="dLed">
+      <div class="card">
+        <h2>Zapojení LED</h2>
+        <p class="hint">LED svítí jen správně otočená (delší nožička = <b>anoda</b> = plus) a vždy potřebuje <b>předřadný rezistor</b>, který omezí proud. Hraj si: zapni obvod, otáčej LED, měň rezistor i baterii a sleduj, co se děje.</p>
+        <div class="svgbox" id="ledSvg"></div>
+        <div class="rowbtns">
+          <button id="ledOnBtn" onclick="led.on^=1;renderLed()">⏻ Zapnout</button>
+          <button onclick="led.flip^=1;renderLed()">🔄 Otočit LED</button>
+        </div>
+        <div class="chips" id="ledRChips"></div>
+        <div class="chips" id="ledUChips"></div>
+        <div class="task" id="ledInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Úkol za body</h2>
+        <div class="task" id="ledGoal"></div>
+        <div class="rowbtns">
+          <button class="btn" onclick="checkLedTask()">✅ Zkontrolovat</button>
+          <button onclick="newLedTask()">🎲 Nový úkol</button>
+        </div>
+        <div id="ledTaskFb"></div>
+        <p class="small">Správně = 12 b. (+bonus za sérii), každý špatný pokus −3.</p>
+      </div>
+    </div>
+
+    <div id="dDio" hidden>
+      <div class="card">
+        <h2>Usměrňovací dioda</h2>
+        <p class="hint">Dioda je jednosměrka pro proud: propouští jen od <b>anody</b> ke <b>katodě</b> (tu značí proužek na pouzdru). Otáčej ji a sleduj žárovku.</p>
+        <div class="svgbox" id="dioSvg"></div>
+        <div class="rowbtns"><button onclick="dio.flip^=1;renderDio()">🔄 Otočit diodu</button></div>
+        <div class="task" id="dioInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Otázky za body</h2>
+        <div class="task" id="dioqQ"></div>
+        <div class="opts" id="dioqOpts"></div>
+        <div id="dioqFb"></div>
+        <button class="btn primary" id="dioqNext" onclick="MC.dioq.next()" hidden>Další otázka ▸</button>
+      </div>
+    </div>
+
+    <div id="dMR" hidden>
+      <div class="card">
+        <h2>Měření rezistoru multimetrem</h2>
+        <p class="hint">Klepni na hodnotu u otočného přepínače a nastav rozsah Ω. <b>„OL"</b> = hodnota je mimo rozsah, otoč výš. Nejpřesnější čtení je na nejmenším rozsahu, kde OL ještě není.</p>
+        <div class="svgbox" id="mrRes"></div>
+        <div class="svgbox" id="mrMeter"></div>
+        <div class="task" id="mrInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Úkol za body</h2>
+        <p class="hint">Změř rezistor a zapiš hodnotu <b>v ohmech</b> – pozor, displej může ukazovat kΩ! Zkontrolovat se můžeš i podle barevných proužků.</p>
+        <div class="inrow">
+          <input class="txt" id="mrAnswer" inputmode="decimal" placeholder="Hodnota">
+          <span class="unit">Ω</span>
+          <button class="btn" onclick="checkMr()">Ověřit</button>
+        </div>
+        <div id="mrFb"></div>
+        <div class="rowbtns"><button onclick="newMr()">🎲 Nový rezistor</button></div>
+        <p class="small">Správně = 12 b. (+bonus), špatný pokus −3.</p>
+      </div>
+    </div>
+
+    <div id="dML" hidden>
+      <div class="card">
+        <h2>Měření LED multimetrem</h2>
+        <p class="hint">LED se testuje v režimu <b>⏄ diodový test</b>: červená sonda na anodu, černá na katodu. Displej ukáže propustné napětí a LED slabě blikne. Občas ti přistane i zničená LED – poznáš ji!</p>
+        <div class="svgbox" id="mlMeter"></div>
+        <div class="svgbox" id="mlLed"></div>
+        <div class="rowbtns">
+          <button onclick="mlS.okProbes^=1;renderMl()">🔁 Prohodit sondy</button>
+          <button onclick="newMl()">🎲 Jiná LED</button>
+        </div>
+        <div class="task" id="mlInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Otázky za body</h2>
+        <div class="task" id="mlqQ"></div>
+        <div class="opts" id="mlqOpts"></div>
+        <div id="mlqFb"></div>
+        <button class="btn primary" id="mlqNext" onclick="MC.mlq.next()" hidden>Další otázka ▸</button>
+      </div>
+    </div>
+
+    <div id="dSP" hidden>
+      <div class="card">
+        <h2>Sériově × paralelně</h2>
+        <p class="hint">Dvě žárovky, jedna baterie. Přepínej zapojení a zkus žárovku „rozbít" – uvidíš, proč jsou zásuvky doma paralelně a proč staré vánoční řetězy tolik zlobily.</p>
+        <div class="chips">
+          <button id="spSer" aria-selected="true" onclick="sp.mode='ser';renderSp()">Sériově</button>
+          <button id="spPar" aria-selected="false" onclick="sp.mode='par';renderSp()">Paralelně</button>
+        </div>
+        <div class="svgbox" id="spSvg"></div>
+        <div class="rowbtns"><button id="spBreakBtn" onclick="sp.broken^=1;renderSp()">💥 Rozbít žárovku 1</button></div>
+        <div class="task" id="spInfo"></div>
+      </div>
+      <div class="card">
+        <h2>Otázky za body</h2>
+        <div class="task" id="spqQ"></div>
+        <div class="opts" id="spqOpts"></div>
+        <div id="spqFb"></div>
+        <button class="btn primary" id="spqNext" onclick="MC.spq.next()" hidden>Další otázka ▸</button>
+      </div>
+    </div>
+  </section>
+
   <p class="small" style="text-align:center;margin-top:6px">Vyrobeno doma s tátou a AI 🤖</p>
 </div>
 
@@ -298,8 +418,10 @@ function failStreak(){ streak=0; updScore(); saveScore(); }
 function showTab(t){
   $('#secR').hidden = t!=='R'; $('#secG').hidden = t!=='G';
   $('#secO').hidden = t!=='O'; $('#secA').hidden = t!=='A';
-  ['R','G','O','A'].forEach(x=>$('#tab'+x).setAttribute('aria-selected', t===x));
+  $('#secD').hidden = t!=='D';
+  ['R','G','O','A','D'].forEach(x=>$('#tab'+x).setAttribute('aria-selected', t===x));
   if(t==='O' && !ohm) newOhm();
+  if(t==='D' && !dReady){ dReady=true; initDilna(); }
 }
 function showR(m){
   $('#rezLearn').hidden = m!=='L'; $('#rezQuiz').hidden = m!=='Q';
@@ -939,6 +1061,328 @@ async function loadApiUrl(){
   }catch(e){}
   $('#apiUrl').value=API_URL;
 }
+
+/* ==================== DÍLNA ==================== */
+let dReady=false;
+function showD(m){
+  ['Led','Dio','MR','ML','SP'].forEach(x=>{ $('#d'+x).hidden = x!==m; });
+  document.querySelectorAll('#dMods button').forEach(b=>b.setAttribute('aria-selected', b.dataset.m===m));
+}
+function initDilna(){
+  renderLed(); newLedTask();
+  renderDio(); MC.dioq.next();
+  newMr();
+  newMl(); MC.mlq.next();
+  renderSp(); MC.spq.next();
+}
+function wSeg2(d,on){ return '<path class="wire'+(on?' on':'')+'" d="'+d+'"/>'; }
+function bulb(x,y,bright,broken){
+  let s='';
+  if(bright>0&&!broken) s+='<circle cx="'+x+'" cy="'+y+'" r="'+(15+9*bright)+'" fill="rgba(255,207,92,'+(0.18+0.4*bright)+')"/>';
+  s+='<circle cx="'+x+'" cy="'+y+'" r="12" fill="'+(broken?'#2a3140':(bright>0?'#ffcf5c':'#3a4a63'))+'" stroke="#7f92ad" stroke-width="2"/>'
+   +'<line x1="'+(x-6)+'" y1="'+(y-6)+'" x2="'+(x+6)+'" y2="'+(y+6)+'" stroke="#7f92ad" stroke-width="1.6"/>'
+   +'<line x1="'+(x-6)+'" y1="'+(y+6)+'" x2="'+(x+6)+'" y2="'+(y-6)+'" stroke="#7f92ad" stroke-width="1.6"/>';
+  if(broken) s+='<text x="'+(x-8)+'" y="'+(y-16)+'" font-size="13">💥</text>';
+  return s;
+}
+
+/* --- kvízový stroj pro Dílnu (přeházené možnosti) --- */
+const MC={};
+function makeMC(prefix, bank, pts){
+  const st={cur:null, ok:0, lock:false, last:-1};
+  MC[prefix]={
+    next(){
+      let i; do{ i=Math.floor(Math.random()*bank.length); }while(bank.length>1&&i===st.last);
+      st.last=i; st.cur=bank[i]; st.lock=false;
+      const ord=st.cur.o.map((_,j)=>j).sort(()=>Math.random()-0.5);
+      st.ok=ord.indexOf(st.cur.k);
+      $('#'+prefix+'Q').textContent=st.cur.q;
+      $('#'+prefix+'Opts').innerHTML=ord.map((j,pos)=>'<button data-i="'+pos+'" onclick="MC.'+prefix+'.ans(this)">'+esc(st.cur.o[j])+'</button>').join('');
+      $('#'+prefix+'Fb').innerHTML='';
+      $('#'+prefix+'Next').hidden=true;
+    },
+    ans(btn){
+      if(st.lock) return; st.lock=true;
+      const i=+btn.dataset.i, good=i===st.ok;
+      document.querySelectorAll('#'+prefix+'Opts button').forEach(b=>{ b.disabled=true; if(+b.dataset.i===st.ok) b.classList.add('ok'); });
+      if(good){
+        const bonus=Math.min(streak,5)*2, e=pts+bonus;
+        addPoints(e);
+        $('#'+prefix+'Fb').innerHTML='<div class="feedback ok">✔ Správně! +'+e+' bodů</div><div class="small" style="margin-top:4px">'+esc(st.cur.e)+'</div>';
+      }else{
+        btn.classList.add('bad'); failStreak();
+        $('#'+prefix+'Fb').innerHTML='<div class="feedback bad">✘ '+esc(st.cur.e)+'</div>';
+      }
+      $('#'+prefix+'Next').hidden=false;
+    }
+  };
+}
+
+/* --- multimetr --- */
+function meterSVG(pos,dial,disp,unit){
+  const cx=100, cy=140, pr=44, lr=72, n=pos.length, a0=-135, a1=135;
+  let t='';
+  pos.forEach((p,i)=>{
+    const a=(a0+(a1-a0)*i/(n-1))*Math.PI/180;
+    const lx=cx+Math.sin(a)*lr, ly=cy-Math.cos(a)*lr;
+    t+='<text x="'+lx+'" y="'+(ly+4)+'" text-anchor="middle" class="dpos'+(i===dial?' dsel':'')+'" data-p="'+i+'">'+p.l+'</text>';
+  });
+  const a=(a0+(a1-a0)*dial/(n-1))*Math.PI/180;
+  const px=cx+Math.sin(a)*(pr-10), py=cy-Math.cos(a)*(pr-10);
+  return '<svg viewBox="0 0 200 200" width="220">'
+   +'<rect x="8" y="2" width="184" height="196" rx="16" fill="#232f42" stroke="#7f92ad" stroke-width="2"/>'
+   +'<rect x="28" y="14" width="144" height="36" rx="6" fill="#9fb48b"/>'
+   +'<text x="146" y="41" text-anchor="end" style="font-family:ui-monospace,monospace;font-size:21px;fill:#16200e">'+disp+'</text>'
+   +'<text x="150" y="41" style="font-size:10px;fill:#16200e">'+(unit||'')+'</text>'
+   +'<circle cx="'+cx+'" cy="'+cy+'" r="'+pr+'" fill="#161f2e" stroke="#7f92ad" stroke-width="2"/>'
+   +'<line x1="'+cx+'" y1="'+cy+'" x2="'+px+'" y2="'+py+'" stroke="#ffcf5c" stroke-width="5" stroke-linecap="round"/>'
+   +'<circle cx="'+cx+'" cy="'+cy+'" r="6" fill="#7f92ad"/>'+t+'</svg>';
+}
+function bindDial(sel,cb){
+  document.querySelectorAll(sel+' .dpos').forEach(el=>{ el.addEventListener('click',()=>cb(+el.dataset.p)); });
+}
+
+/* --- modul: zapojení LED --- */
+const led={on:0, flip:0, U:9, r:'none'};
+const LED_R=['none','68','220','470','1000'];
+function ledCurrent(){
+  if(!led.on||led.flip) return 0;
+  if(led.r==='none') return 999;
+  return (led.U-2)/(+led.r)*1000;
+}
+function ledSVG(){
+  const I=ledCurrent();
+  const lit = led.on && !led.flip && led.r!=='none' && I>=1 && I<=25;
+  const burn = led.on && !led.flip && (led.r==='none'||I>25);
+  const glow = lit?Math.min(1,I/20):0;
+  const flip=led.flip;
+  const tri = flip?'M266,28 L266,52 L246,40 Z':'M246,28 L246,52 L266,40 Z';
+  const bar = flip?'M244,28 L244,52':'M268,28 L268,52';
+  return '<svg viewBox="0 0 340 140" width="340">'
+   +'<line x1="30" y1="55" x2="30" y2="85" class="lead"/><line x1="42" y1="45" x2="42" y2="95" class="lead"/>'
+   +'<text class="svglabel" x="12" y="40">'+led.U+' V</text><text class="svglabel" x="46" y="40">+</text>'
+   +wSeg2('M42,40 H90',lit)
+   +(led.on?wSeg2('M90,40 H120',lit):'<line class="wire" x1="90" y1="40" x2="116" y2="24"/>')
+   +'<circle class="node" cx="90" cy="40" r="4"/><circle class="node" cx="120" cy="40" r="4"/>'
+   +wSeg2('M120,40 H150',lit)
+   +'<rect x="150" y="30" width="46" height="20" fill="none" stroke="'+(led.r==='none'?'#8a4a4a':'#7f92ad')+'" stroke-width="2"'+(led.r==='none'?' stroke-dasharray="4 3"':'')+'/>'
+   +'<text class="svglabel" x="150" y="66">'+(led.r==='none'?'bez R!':led.r+' Ω')+'</text>'
+   +wSeg2('M196,40 H246',lit)
+   +(lit?'<circle cx="256" cy="40" r="'+(14+10*glow)+'" fill="rgba(255,207,92,'+(0.25+0.45*glow)+')"/>':'')
+   +(burn?'<text x="242" y="20" font-size="18">💥</text>':'')
+   +'<path d="'+tri+'" fill="'+(lit?'#ffcf5c':'#3a4a63')+'" stroke="#7f92ad" stroke-width="2"/>'
+   +'<path d="'+bar+'" stroke="#7f92ad" stroke-width="3"/>'
+   +'<text class="svglabel" x="'+(flip?272:230)+'" y="66">A</text><text class="svglabel" x="'+(flip?230:272)+'" y="66">K</text>'
+   +wSeg2('M268,40 H310 V110 H36 V85',lit)+'</svg>';
+}
+function renderLed(){
+  const I=ledCurrent();
+  let state;
+  if(!led.on) state='Obvod je vypnutý – zapni vypínač.';
+  else if(led.flip) state='LED je otočená obráceně (závěrný směr) – proud neteče, nesvítí. Nic se jí ale neděje.';
+  else if(led.r==='none') state='💥 Bez předřadného rezistoru proud nic neomezuje – LED by okamžitě shořela!';
+  else if(I>25) state='💥 Proud '+czNum(I,1)+' mA je moc (limit ~25 mA) – LED by shořela. Dej větší rezistor.';
+  else if(I<5) state='LED sotva svítí – proud jen '+czNum(I,1)+' mA. Zkus menší rezistor nebo větší napětí.';
+  else state='✅ LED svítí. I = ('+led.U+' − 2) / '+led.r+' = '+czNum(I,1)+' mA – bezpečná hodnota.';
+  $('#ledSvg').innerHTML=ledSVG();
+  $('#ledInfo').textContent=state;
+  $('#ledOnBtn').textContent=led.on?'⏻ Vypnout':'⏻ Zapnout';
+  $('#ledRChips').innerHTML='<span class="small" style="align-self:center">Rezistor:</span>'+LED_R.map(r=>'<button aria-selected="'+(led.r===r)+'" onclick="led.r=\''+r+'\';renderLed()">'+(r==='none'?'žádný':r+' Ω')+'</button>').join('');
+  $('#ledUChips').innerHTML='<span class="small" style="align-self:center">Baterie:</span>'+[5,9,12].map(u=>'<button aria-selected="'+(led.U===u)+'" onclick="led.U='+u+';renderLed()">'+u+' V</button>').join('');
+}
+let ledTask={U:9, wrong:0, done:false};
+function newLedTask(){
+  ledTask={U:rnd([5,9,12]), wrong:0, done:false};
+  led.on=0; led.flip=Math.random()<0.5?1:0; led.r='none';
+  renderLed();
+  $('#ledGoal').textContent='🎯 Cíl: s baterií '+ledTask.U+' V rozsviť LED bezpečně (proud 5–25 mA). Nastav obvod nahoře a dej zkontrolovat.';
+  $('#ledTaskFb').innerHTML='';
+}
+function checkLedTask(){
+  if(ledTask.done){ $('#ledTaskFb').innerHTML='<div class="small">Hotovo – dej si 🎲 Nový úkol.</div>'; return; }
+  const I=ledCurrent();
+  let msg=null;
+  if(led.U!==ledTask.U) msg='Úkol chce baterii '+ledTask.U+' V – přepni ji.';
+  else if(!led.on) msg='Obvod je vypnutý – zapni vypínač.';
+  else if(led.flip) msg='LED je obráceně – v tomhle směru jí proud neproteče.';
+  else if(led.r==='none') msg='Chybí předřadný rezistor – takhle by LED shořela!';
+  else if(I>25) msg='Proud '+czNum(I,1)+' mA je nad limit – zvol větší rezistor.';
+  else if(I<5) msg='Proud jen '+czNum(I,1)+' mA – LED skoro nesvítí. Zvol menší rezistor.';
+  if(msg){
+    ledTask.wrong++;
+    $('#ledTaskFb').innerHTML='<div class="feedback bad">✘ '+msg+' (−3 b. z odměny)</div>';
+  }else{
+    const bonus=Math.min(streak,5)*2;
+    const earned=Math.max(2, 12+bonus-3*ledTask.wrong);
+    addPoints(earned); ledTask.done=true;
+    $('#ledTaskFb').innerHTML='<div class="feedback ok">✔ Přesně tak! I = '+czNum(I,1)+' mA. +'+earned+' bodů</div>';
+  }
+}
+
+/* --- modul: usměrňovací dioda --- */
+const dio={flip:0};
+function renderDio(){
+  const flow=!dio.flip;
+  const tri=dio.flip?'M186,33 L186,57 L166,45 Z':'M166,33 L166,57 L186,45 Z';
+  const bar=dio.flip?'M164,33 L164,57':'M188,33 L188,57';
+  $('#dioSvg').innerHTML='<svg viewBox="0 0 340 120" width="340">'
+   +'<line x1="30" y1="45" x2="30" y2="75" class="lead"/><line x1="42" y1="35" x2="42" y2="85" class="lead"/>'
+   +'<text class="svglabel" x="12" y="30">9 V</text><text class="svglabel" x="46" y="30">+</text>'
+   +wSeg2('M42,45 H164',flow)
+   +'<path d="'+tri+'" fill="#3a4a63" stroke="#7f92ad" stroke-width="2"/><path d="'+bar+'" stroke="#7f92ad" stroke-width="3"/>'
+   +'<text class="svglabel" x="'+(dio.flip?192:148)+'" y="74">A</text><text class="svglabel" x="'+(dio.flip?148:192)+'" y="74">K</text>'
+   +wSeg2('M188,45 H238',flow)+bulb(250,45,flow?1:0,false)
+   +wSeg2('M262,45 H310 V100 H36 V75',flow)+'</svg>';
+  $('#dioInfo').textContent = flow
+   ?'Propustný směr: anoda je na plusu, dioda proud pustí (sebere si ~0,7 V) a žárovka svítí.'
+   :'Závěrný směr: na plusu je katoda (proužek) – dioda proud zablokuje a žárovka nesvítí. Přesně takhle dioda chrání zařízení před přehozením + a −.';
+}
+const DIO_BANK=[
+ {q:'Kterým směrem propouští dioda proud?',o:['Od anody ke katodě','Od katody k anodě','Oběma směry','Žádným směrem'],k:0,e:'Proud teče jen od anody (+) ke katodě. Katodu poznáš podle proužku na pouzdru.'},
+ {q:'Co označuje proužek na pouzdru usměrňovací diody?',o:['Katodu','Anodu','Maximální proud','Výrobce'],k:0,e:'Proužek = katoda. Při zapojování je to nejdůležitější značka na diodě.'},
+ {q:'Jaký je typický úbytek napětí na křemíkové diodě v propustném směru?',o:['~0,7 V','~0,2 V','~2 V','~5 V'],k:0,e:'Křemíková dioda si „vezme" zhruba 0,7 V. (LED mívají víc: 1,8–3,2 V.)'},
+ {q:'K čemu se usměrňovací dioda nejčastěji používá?',o:['K přeměně střídavého proudu na stejnosměrný','K zesílení signálu','K uchování energie','Ke svícení'],k:0,e:'Usměrňovač najdeš v každé nabíječce a zdroji – proto se jí říká usměrňovací.'},
+ {q:'Co udělá žárovka v sérii s diodou zapojenou závěrně?',o:['Nesvítí – proud neteče','Svítí naplno','Svítí polovičně','Dioda shoří'],k:0,e:'V závěrném směru dioda proud zablokuje. Nic se nezničí, jen nic neteče.'},
+ {q:'Dioda zapojená u napájecího konektoru zařízení slouží jako…',o:['Ochrana proti přepólování','Pojistka proti zkratu','Stabilizátor napětí','Anténa'],k:0,e:'Když někdo prohodí + a −, dioda proud nepustí a elektronika přežije.'}
+];
+
+/* --- modul: měření rezistoru --- */
+const MR_POS=[
+ {l:'OFF'},
+ {l:'V⎓'},
+ {l:'200Ω',max:200,unit:'Ω',fmt:function(v){return v.toFixed(1);}},
+ {l:'2k',max:2000,unit:'kΩ',fmt:function(v){return (v/1000).toFixed(3);}},
+ {l:'20k',max:20000,unit:'kΩ',fmt:function(v){return (v/1000).toFixed(2);}},
+ {l:'200k',max:200000,unit:'kΩ',fmt:function(v){return (v/1000).toFixed(1);}},
+ {l:'⏄'}
+];
+const MR_VALUES=[100,220,330,470,680,1000,2200,4700,10000,22000,47000,100000];
+function valueToBands(v){
+  let e=0, x=v;
+  while(x>=100){ x/=10; e++; }
+  return [DIG[Math.floor(x/10)], DIG[Math.round(x%10)], MUL[e], 'zlata'];
+}
+let mr={v:470, dial:0, wrong:0, done:false};
+function newMr(){
+  mr={v:rnd(MR_VALUES), dial:0, wrong:0, done:false};
+  $('#mrAnswer').value=''; $('#mrFb').innerHTML='';
+  renderMr();
+}
+function renderMr(){
+  const p=MR_POS[mr.dial];
+  let disp='', unit='';
+  if(p.l==='V⎓'){ disp='0.00'; unit='V'; }
+  else if(p.l==='⏄'){ disp='—'; }
+  else if(p.max){ if(mr.v>p.max){ disp='OL'; unit=p.unit; } else { disp=p.fmt(mr.v); unit=p.unit; } }
+  $('#mrMeter').innerHTML=meterSVG(MR_POS,mr.dial,disp,unit);
+  bindDial('#mrMeter',function(i){ mr.dial=i; renderMr(); });
+  $('#mrRes').innerHTML=resistorSVG(valueToBands(mr.v),false,'MR');
+  let t;
+  if(p.l==='OFF') t='Multimetr je vypnutý – otoč přepínač na rozsah Ω.';
+  else if(p.l==='V⎓') t='Tohle je měření napětí. Na odpor potřebuješ rozsahy Ω.';
+  else if(p.l==='⏄') t='Diodový test – na rezistory se nepoužívá, přepni na rozsah Ω.';
+  else if(mr.v>p.max) t='„OL" (Over Limit) = hodnota je větší než rozsah '+p.l+'. Otoč přepínač na vyšší rozsah.';
+  else t='Rozsah '+p.l+': displej ukazuje hodnotu v '+p.unit+'. Nejpřesnější čtení je na nejmenším rozsahu, kde ještě není OL.';
+  $('#mrInfo').textContent=t;
+}
+function checkMr(){
+  if(mr.done){ $('#mrFb').innerHTML='<div class="small">Hotovo – dej si 🎲 Nový rezistor.</div>'; return; }
+  const u=parseNum($('#mrAnswer').value);
+  if(isNaN(u)){ $('#mrFb').innerHTML='<div class="feedback bad">Zadej hodnotu číslem v ohmech.</div>'; return; }
+  if(isClose(u,mr.v)){
+    const bonus=Math.min(streak,5)*2;
+    const earned=Math.max(2, 12+bonus-3*mr.wrong);
+    addPoints(earned); mr.done=true;
+    $('#mrFb').innerHTML='<div class="feedback ok">✔ Správně, '+fmtOhm(mr.v)+'! +'+earned+' bodů</div>';
+  }else{
+    mr.wrong++;
+    $('#mrFb').innerHTML='<div class="feedback bad">✘ To nesedí. Pozor na jednotky – displej může ukazovat kΩ, odpověď chceme v Ω. (−3 b. z odměny)</div>';
+  }
+}
+
+/* --- modul: měření LED --- */
+const ML_COLORS=[['červená',1.8,'#ff6b6b'],['zelená',2.1,'#5fd98a'],['žlutá',2.0,'#ffd85c'],['modrá',3.0,'#6b93ff']];
+const ML_POS=[{l:'OFF'},{l:'V⎓'},{l:'Ω'},{l:'⏄'}];
+let mlS={c:0, okProbes:1, dial:3, dead:false};
+function newMl(){
+  mlS.c=Math.floor(Math.random()*ML_COLORS.length);
+  mlS.dead=Math.random()<0.25;
+  mlS.okProbes=1; mlS.dial=3;
+  renderMl();
+}
+function renderMl(){
+  const C=ML_COLORS[mlS.c], p=ML_POS[mlS.dial];
+  let disp='', unit='', info='';
+  const lit = p.l==='⏄' && mlS.okProbes && !mlS.dead;
+  if(p.l==='OFF') info='Multimetr je vypnutý.';
+  else if(p.l==='V⎓'){ disp='0.00'; unit='V'; info='Měření napětí ti o LED nic neřekne – přepni na diodový test ⏄.'; }
+  else if(p.l==='Ω'){ disp='OL'; info='V rozsahu Ω ukáže LED většinou „OL" – měřicí napětí je moc malé, aby ji otevřelo. Použij diodový test ⏄.'; }
+  else if(mlS.dead){ disp='OL'; info='OL… zkus prohodit sondy. Když je OL v OBOU směrech, LED je přerušená – tahle je bohužel zničená. Vezmi si jinou (🎲).'; }
+  else if(mlS.okProbes){ disp=C[1].toFixed(2); unit='V'; info='Displej ukazuje propustné napětí '+czNum(C[1])+' V ('+C[0]+' LED) a LED slabě svítí → je v pořádku. Červená sonda je správně na anodě.'; }
+  else { disp='OL'; info='OL = proud neteče: červená sonda je na katodě. Prohoď sondy. (OL v jednom směru je u zdravé LED naprosto správně!)'; }
+  $('#mlMeter').innerHTML=meterSVG(ML_POS,mlS.dial,disp,unit);
+  bindDial('#mlMeter',function(i){ mlS.dial=i; renderMl(); });
+  let l='<svg viewBox="0 0 220 84" width="220">';
+  if(lit) l+='<circle cx="110" cy="34" r="24" fill="'+C[2]+'" opacity="0.35"/>';
+  l+='<circle cx="110" cy="34" r="14" fill="'+(lit?C[2]:'#3a4a63')+'" stroke="#7f92ad" stroke-width="2"/>'
+   +'<text class="svglabel" x="60" y="40">A</text><text class="svglabel" x="150" y="40">K</text>'
+   +'<circle cx="'+(mlS.okProbes?80:140)+'" cy="34" r="6" fill="#e04a4a"/>'
+   +'<circle cx="'+(mlS.okProbes?140:80)+'" cy="34" r="6" fill="#1a1a1a" stroke="#8fa1b8"/>'
+   +'<text class="svglabel" x="46" y="74">🔴 červená sonda · ⚫ černá sonda</text></svg>';
+  $('#mlLed').innerHTML=l;
+  $('#mlInfo').textContent=info;
+}
+const MLQ_BANK=[
+ {q:'Jaký režim multimetru použiješ na test LED?',o:['Diodový test ⏄','Rozsah Ω','Napětí V','Proud A'],k:0,e:'Diodový test pustí do LED malý proud a ukáže její propustné napětí.'},
+ {q:'Červená (+) sonda patří při měření LED na…',o:['Anodu (delší nožičku)','Katodu','Je to jedno','Na obě zároveň'],k:0,e:'Červená na anodu, černá na katodu – pak displej ukáže napětí a LED slabě blikne.'},
+ {q:'Displej ukazuje OL v obou polaritách. Co to znamená?',o:['LED je přerušená (zničená)','LED je v pořádku','LED má vybitou baterii','Multimetr je rozbitý'],k:0,e:'Zdravá LED vede aspoň jedním směrem. OL oběma směry = přerušený přechod, LED do koše.'},
+ {q:'Diodový test ukázal 1.92. Co je to za číslo?',o:['Propustné napětí ve voltech','Odpor v ohmech','Proud v ampérech','Teplota čipu'],k:0,e:'Je to úbytek napětí v propustném směru – u červené LED typicky 1,8–2,0 V, u modré ~3 V.'},
+ {q:'Proč LED při diodovém testu slabě svítí?',o:['Multimetr do ní pouští malý proud','Svítí zbytkovým světlem','Signalizuje chybu měření','Nesvítí nikdy'],k:0,e:'Testovací proud (~1 mA) stačí, aby se LED lehce rozsvítila – rychlá kontrola, že žije.'},
+ {q:'V rozsahu Ω ukazuje LED často OL. Proč?',o:['Měřicí napětí je moc malé na její otevření','LED má nekonečný odpor','Multimetr LED nepozná','Je to porucha přístroje'],k:0,e:'Ohmový rozsah používá malé napětí, které LED (potřebuje ~2 V) neotevře – proto se používá diodový test.'}
+];
+
+/* --- modul: sériově × paralelně --- */
+const sp={mode:'ser', broken:0};
+function renderSp(){
+  $('#spSer').setAttribute('aria-selected', sp.mode==='ser');
+  $('#spPar').setAttribute('aria-selected', sp.mode==='par');
+  $('#spBreakBtn').textContent=sp.broken?'🔧 Opravit žárovku 1':'💥 Rozbít žárovku 1';
+  let s, info;
+  if(sp.mode==='ser'){
+    const flow=!sp.broken;
+    s='<svg viewBox="0 0 340 120" width="340">'
+     +'<line x1="30" y1="45" x2="30" y2="75" class="lead"/><line x1="42" y1="35" x2="42" y2="85" class="lead"/><text class="svglabel" x="14" y="28">9 V</text>'
+     +wSeg2('M42,45 H88',flow)+bulb(100,45,flow?0.5:0,!!sp.broken)
+     +wSeg2('M112,45 H158',flow)+bulb(170,45,flow?0.5:0,false)
+     +wSeg2('M182,45 H310 V100 H36 V75',flow)+'</svg>';
+    info=sp.broken
+      ?'Žárovka 1 je přerušená → v sérii je jen jedna cesta pro proud, takže zhasly OBĚ. Přesně tohle dělaly staré vánoční řetězy.'
+      :'Sériově: proud teče jednou společnou cestou přes obě žárovky. Napětí 9 V se rozdělí – na každé je 4,5 V, proto svítí slaběji.';
+  }else{
+    s='<svg viewBox="0 0 340 130" width="340">'
+     +'<line x1="30" y1="50" x2="30" y2="80" class="lead"/><line x1="42" y1="40" x2="42" y2="90" class="lead"/><text class="svglabel" x="14" y="32">9 V</text>'
+     +wSeg2('M42,50 H90',true)
+     +wSeg2('M90,50 V30 H148',!sp.broken)+bulb(160,30,sp.broken?0:1,!!sp.broken)+wSeg2('M172,30 H230 V50',!sp.broken)
+     +wSeg2('M90,50 V95 H148',true)+bulb(160,95,1,false)+wSeg2('M172,95 H230 V50',true)
+     +wSeg2('M230,50 H310 V115 H36 V80',true)+'</svg>';
+    info=sp.broken
+      ?'Žárovka 1 je přerušená, ale žárovka 2 má vlastní větev s plnými 9 V a svítí dál. Proto jsou zásuvky a světla v bytě zapojené paralelně.'
+      :'Paralelně: každá žárovka má vlastní větev a plných 9 V – obě svítí naplno. Baterie ale dodává větší proud, takže se vybije rychleji.';
+  }
+  $('#spSvg').innerHTML=s;
+  $('#spInfo').textContent=info;
+}
+const SPQ_BANK=[
+ {q:'V sériovém zapojení praskne jedna žárovka. Co udělají ostatní?',o:['Zhasnou všechny','Svítí dál stejně','Svítí jasněji','Začnou blikat'],k:0,e:'Série = jedna cesta pro proud. Přeruší se kdekoli, přeruší se všude – klasika starých vánočních řetězů.'},
+ {q:'V paralelním zapojení praskne jedna žárovka. Co ostatní?',o:['Svítí dál','Zhasnou také','Ztlumí se na polovinu','Shoří'],k:0,e:'Každá větev má vlastní cestu k baterii – proto jsou zásuvky v bytě paralelně.'},
+ {q:'Dvě stejné žárovky na jedné baterii. Kdy svítí jasněji?',o:['Paralelně','Sériově','Stejně v obou případech','Nesvítí ani v jednom'],k:0,e:'Paralelně má každá plné napětí baterie. V sérii se o napětí dělí, takže svítí slaběji.'},
+ {q:'Baterie 9 V, dvě stejné žárovky v sérii. Kolik voltů je na každé?',o:['4,5 V','9 V','18 V','0 V'],k:0,e:'V sérii se napětí rozdělí – u dvou stejných žárovek přesně napůl.'},
+ {q:'Jak jsou zapojené zásuvky v bytě?',o:['Paralelně','Sériově','Střídavě sériově a paralelně','Nejsou propojené'],k:0,e:'Každý spotřebič dostane plných 230 V a funguje nezávisle na ostatních.'},
+ {q:'Celkový odpor dvou stejných rezistorů v sérii je oproti jednomu…',o:['Dvojnásobný','Poloviční','Stejný','Nulový'],k:0,e:'Sériově se odpory sčítají. Paralelně je to naopak – u dvou stejných vyjde polovina.'}
+];
+makeMC('dioq',DIO_BANK,8);
+makeMC('mlq',MLQ_BANK,8);
+makeMC('spq',SPQ_BANK,8);
 
 /* ---------- start ---------- */
 renderLearn();
