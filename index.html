@@ -285,6 +285,7 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
       <button data-m="MR" aria-selected="false" onclick="showD('MR')">🔧 Měř R</button>
       <button data-m="ML" aria-selected="false" onclick="showD('ML')">🔦 Měř LED</button>
       <button data-m="SP" aria-selected="false" onclick="showD('SP')">🔗 Sér × Par</button>
+      <button data-m="Ob" aria-selected="false" onclick="showD('Ob')">⚡ Obvody</button>
     </div>
 
     <div id="dLed">
@@ -390,6 +391,24 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
         <div class="opts" id="spqOpts"></div>
         <div id="spqFb"></div>
         <button class="btn primary" id="spqNext" onclick="MC.spq.next()" hidden>Další otázka ▸</button>
+      </div>
+    </div>
+
+    <div id="dOb" hidden>
+      <div class="card">
+        <h2>Zapojování obvodů</h2>
+        <p class="hint">Postav si vlastní elektrický obvod – jako zásuvky a světla doma. <b>Vlevo je + sběrnice, vpravo − sběrnice</b> (jako lišty na nepájivém poli). Vyber si nástroj a klepni na tečkovanou hranu mezi nimi, kam ho chceš položit. Vypínače se přepínají v seznamu pod obrázkem.</p>
+        <div class="chips" id="ogMissions"></div>
+        <div class="task" id="ogGoal"></div>
+        <div class="chips" id="ogTools"></div>
+        <div class="svgbox" id="ogSvg"></div>
+        <div class="rowbtns" id="ogSwitches"></div>
+        <div class="rowbtns">
+          <button onclick="ogReset()">🗑️ Vymazat vše</button>
+          <button class="btn" id="ogCheckBtn" onclick="ogCheck()" hidden>✅ Zkontrolovat</button>
+        </div>
+        <div id="ogFb"></div>
+        <div class="task" id="ogInfo"></div>
       </div>
     </div>
   </section>
@@ -1086,7 +1105,7 @@ async function loadApiUrl(){
 /* ==================== DÍLNA ==================== */
 let dReady=false;
 function showD(m){
-  ['Led','Dio','MR','ML','SP'].forEach(x=>{ $('#d'+x).hidden = x!==m; });
+  ['Led','Dio','MR','ML','SP','Ob'].forEach(x=>{ $('#d'+x).hidden = x!==m; });
   document.querySelectorAll('#dMods button').forEach(b=>b.setAttribute('aria-selected', b.dataset.m===m));
 }
 function initDilna(){
@@ -1095,6 +1114,7 @@ function initDilna(){
   newMr();
   newMl(); MC.mlq.next();
   renderSp(); MC.spq.next();
+  renderOG();
 }
 function wSeg2(d,on){ return '<path class="wire'+(on?' on':'')+'" d="'+d+'"/>'; }
 function bulb(x,y,bright,broken){
@@ -1404,6 +1424,198 @@ const SPQ_BANK=[
 makeMC('dioq',DIO_BANK,8);
 makeMC('mlq',MLQ_BANK,8);
 makeMC('spq',SPQ_BANK,8);
+
+/* --- modul: zapojování obvodů --- */
+const OG_COLS=4, OG_ROWS=3;
+const OG_PLUS_NODES=[0,4,8], OG_MINUS_NODES=[3,7,11]; // celý levý sloupec = + sběrnice, pravý = − sběrnice
+const OG_PLUS=0, OG_MINUS=3;
+function ogId(c,r){ return r*OG_COLS+c; }
+function ogPos(c,r){ return {x:50+c*90, y:34+r*62}; }
+let _ogEdges=null;
+function ogEdgeList(){
+  if(_ogEdges) return _ogEdges;
+  const arr=[];
+  for(let r=0;r<OG_ROWS;r++) for(let c=0;c<OG_COLS-1;c++) arr.push({id:'h_'+c+'_'+r, a:ogId(c,r), b:ogId(c+1,r)});
+  for(let c=1;c<=2;c++) for(let r=0;r<OG_ROWS-1;r++) arr.push({id:'v_'+c+'_'+r, a:ogId(c,r), b:ogId(c,r+1)}); // jen vnitřní sloupce – krajní jsou pevné sběrnice
+  _ogEdges=arr; return arr;
+}
+function ogBusEdges(){
+  return [{a:ogId(0,0),b:ogId(0,1)},{a:ogId(0,1),b:ogId(0,2)},{a:ogId(3,0),b:ogId(3,1)},{a:ogId(3,1),b:ogId(3,2)}];
+}
+function ogSimulate(edgesState, override){
+  const parent=Array.from({length:OG_COLS*OG_ROWS},(_,i)=>i);
+  function find(x){ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; }
+  function union(x,y){ const fx=find(x),fy=find(y); if(fx!==fy) parent[fx]=fy; }
+  ogBusEdges().forEach(e=>union(e.a,e.b)); // + a − sběrnice jsou vždy propojené napevno
+  ogEdgeList().forEach(e=>{
+    const el=edgesState[e.id]; if(!el) return;
+    let on;
+    if(el.type==='wire') on=true;
+    else if(el.type==='switch') on = override && (e.id in override) ? override[e.id] : !!el.on;
+    else on=false;
+    if(on) union(e.a,e.b);
+  });
+  const plus=find(OG_PLUS), minus=find(OG_MINUS);
+  const shorted = plus===minus;
+  const powered={};
+  if(!shorted){
+    ogEdgeList().forEach(e=>{
+      const el=edgesState[e.id]; if(!el||(el.type!=='bulb'&&el.type!=='socket')) return;
+      const fa=find(e.a), fb=find(e.b);
+      powered[e.id] = (fa===plus&&fb===minus)||(fa===minus&&fb===plus);
+    });
+  }
+  return {shorted, powered, find, plus, minus};
+}
+const OG_TASKS=[
+ { title:'Úkol 1: Žárovka na vypínač', pts:14,
+   desc:'Zapoj přesně jednu žárovku a jeden vypínač tak, aby žárovka svítila jen když je vypínač zapnutý.',
+   check(edges){
+     const bulbs=Object.entries(edges).filter(e=>e[1].type==='bulb');
+     const sws=Object.entries(edges).filter(e=>e[1].type==='switch');
+     if(bulbs.length!==1) return {ok:false,msg:'Potřebuješ přesně jednu žárovku (teď máš '+bulbs.length+').'};
+     if(sws.length!==1) return {ok:false,msg:'Potřebuješ přesně jeden vypínač (teď máš '+sws.length+').'};
+     const sw=sws[0][0], bl=bulbs[0][0];
+     const off=ogSimulate(edges,{[sw]:false}), on=ogSimulate(edges,{[sw]:true});
+     if(off.shorted||on.shorted) return {ok:false,msg:'V obvodu je zkrat – zkontroluj zapojení.'};
+     if(on.powered[bl] && !off.powered[bl]) return {ok:true};
+     return {ok:false,msg:'Žárovka se podle vypínače zatím nechová správně – zkontroluj, jestli leží mezi + a −.'};
+   }},
+ { title:'Úkol 2: Zásuvka stále pod napětím', pts:12,
+   desc:'Zapoj jednu zásuvku, která je pod napětím pořád – bez jakéhokoli vypínače.',
+   check(edges){
+     const sock=Object.entries(edges).filter(e=>e[1].type==='socket');
+     const sws=Object.entries(edges).filter(e=>e[1].type==='switch');
+     if(sock.length!==1) return {ok:false,msg:'Potřebuješ přesně jednu zásuvku (teď máš '+sock.length+').'};
+     if(sws.length!==0) return {ok:false,msg:'Tenhle úkol chce zapojení BEZ vypínače – teď máš '+sws.length+'.'};
+     const sim=ogSimulate(edges,{});
+     if(sim.shorted) return {ok:false,msg:'V obvodu je zkrat – zkontroluj zapojení.'};
+     if(sim.powered[sock[0][0]]) return {ok:true};
+     return {ok:false,msg:'Zásuvka zatím není pod napětím – propoj ji dráty až ke zdroji.'};
+   }},
+ { title:'Úkol 3: Nezávislé ovládání', pts:18,
+   desc:'Zapoj žárovku a zásuvku, každou s vlastním vypínačem, tak aby fungovaly nezávisle na sobě.',
+   check(edges){
+     const bulbs=Object.entries(edges).filter(e=>e[1].type==='bulb');
+     const sock=Object.entries(edges).filter(e=>e[1].type==='socket');
+     const sws=Object.entries(edges).filter(e=>e[1].type==='switch');
+     if(bulbs.length!==1) return {ok:false,msg:'Potřebuješ přesně jednu žárovku.'};
+     if(sock.length!==1) return {ok:false,msg:'Potřebuješ přesně jednu zásuvku.'};
+     if(sws.length!==2) return {ok:false,msg:'Potřebuješ přesně dva vypínače (teď máš '+sws.length+').'};
+     const [s1,s2]=sws.map(x=>x[0]);
+     const bl=bulbs[0][0], sk=sock[0][0];
+     const combos=[[false,false],[true,false],[false,true],[true,true]];
+     const res=combos.map(([a,b])=>ogSimulate(edges,{[s1]:a,[s2]:b}));
+     if(res.some(r=>r.shorted)) return {ok:false,msg:'V některé kombinaci vypínačů vzniká zkrat.'};
+     const bv=res.map(r=>!!r.powered[bl]), sv=res.map(r=>!!r.powered[sk]);
+     const dependsOnly=(v,idx)=> idx===0
+       ? (v[0]===v[2] && v[1]===v[3] && v[0]!==v[1])
+       : (v[0]===v[1] && v[2]===v[3] && v[0]!==v[2]);
+     const bOn1=dependsOnly(bv,0), bOn2=dependsOnly(bv,1);
+     const sOn1=dependsOnly(sv,0), sOn2=dependsOnly(sv,1);
+     if((bOn1&&sOn2)||(bOn2&&sOn1)) return {ok:true};
+     return {ok:false,msg:'Žárovka a zásuvka zatím nereagují nezávisle – ověř to postupně po jednotlivých vypínačích.'};
+   }}
+];
+const OG_TOOLS=[['wire','🔌 Drát'],['switch','🔀 Vypínač'],['bulb','💡 Žárovka'],['socket','🧷 Zásuvka'],['eraser','🧹 Guma']];
+let og={mission:0, tool:'wire', edges:{}, checked:false, wrongCount:0, fbHtml:''};
+function ogSetMission(m){ og.mission=m; ogReset(); }
+function ogSetTool(t){ og.tool=t; renderOG(); }
+function ogReset(){ og.edges={}; og.checked=false; og.wrongCount=0; og.fbHtml=''; renderOG(); }
+function ogEdgeClick(id){
+  if(og.checked) return; // po splnění úkolu už se nemění (zůstane vidět hotové řešení)
+  if(og.tool==='eraser'){ delete og.edges[id]; }
+  else if(og.tool==='switch'){ og.edges[id]={type:'switch', on:false}; }
+  else { og.edges[id]={type:og.tool}; }
+  renderOG();
+}
+function ogToggleSwitch(id){ if(og.edges[id]){ og.edges[id].on=!og.edges[id].on; renderOG(); } }
+function ogCheck(){
+  const task=OG_TASKS[og.mission-1];
+  const res=task.check(og.edges);
+  if(res.ok){
+    const bonus=Math.min(streak,5)*2, penalty=og.wrongCount*5;
+    const earned=Math.max(4, task.pts+bonus-penalty);
+    addPoints(earned); og.checked=true;
+    og.fbHtml='<div class="feedback ok">✔ Úkol splněn! +'+earned+' bodů'+(penalty?' (−'+penalty+' za pokusy)':'')+'</div>';
+  }else{
+    og.wrongCount++;
+    og.fbHtml='<div class="feedback bad">✘ '+esc(res.msg)+' (−5 b. z odměny)</div>';
+  }
+  renderOG();
+}
+function renderOG(){
+  $('#ogMissions').innerHTML=['Volná stavba',...OG_TASKS.map(t=>t.title.replace(/^Úkol \d+: /,''))]
+    .map((l,i)=>'<button aria-selected="'+(og.mission===i)+'" onclick="ogSetMission('+i+')">'+esc(l)+'</button>').join('');
+  $('#ogGoal').textContent = og.mission===0
+    ? '🎨 Volná stavba – zkoušej si zapojení, nic se tu neboduje.'
+    : '🎯 '+OG_TASKS[og.mission-1].desc+' (odměna '+OG_TASKS[og.mission-1].pts+' b.)';
+  $('#ogTools').innerHTML=OG_TOOLS.map(([t,l])=>'<button aria-selected="'+(og.tool===t)+'" onclick="ogSetTool(\''+t+'\')">'+l+'</button>').join('');
+  $('#ogCheckBtn').hidden = og.mission===0;
+
+  const sim=ogSimulate(og.edges,null);
+  const poweredAny=Object.values(sim.powered).some(Boolean);
+  let s='<svg viewBox="0 0 370 200" width="370" aria-label="mřížka pro zapojení obvodu">';
+  // pevné sběrnice + a −
+  const busOn = !sim.shorted; // sběrnice jsou vždy vodivé; při zkratu obě zčervenají
+  ogBusEdges().forEach(be=>{
+    const c1=be.a%OG_COLS, r1=(be.a/OG_COLS)|0, c2=be.b%OG_COLS, r2=(be.b/OG_COLS)|0;
+    const pa=ogPos(c1,r1), pb=ogPos(c2,r2);
+    const isPlus = c1===0;
+    s+='<line x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="'+(sim.shorted?'#f87171':(isPlus?'#e04a4a':'#3a6fc4'))+'" stroke-width="5" stroke-linecap="round" pointer-events="none"/>';
+  });
+  s+='<text class="svglabel big" x="14" y="20" pointer-events="none">+ sběrnice</text>';
+  s+='<text class="svglabel big" x="284" y="20" pointer-events="none">− sběrnice</text>';
+  // prázdné (klikací) hrany pod vším
+  ogEdgeList().forEach(e=>{
+    if(og.edges[e.id]) return;
+    const c1=e.a%OG_COLS, r1=(e.a/OG_COLS)|0, c2=e.b%OG_COLS, r2=(e.b/OG_COLS)|0;
+    const pa=ogPos(c1,r1), pb=ogPos(c2,r2);
+    s+='<line x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="#3a4a63" stroke-width="3" stroke-dasharray="2 5" opacity=".55" data-e="'+e.id+'" style="cursor:pointer"/>';
+  });
+  // obsazené hrany
+  ogEdgeList().forEach(e=>{
+    const el=og.edges[e.id]; if(!el) return;
+    const c1=e.a%OG_COLS, r1=(e.a/OG_COLS)|0, c2=e.b%OG_COLS, r2=(e.b/OG_COLS)|0;
+    const pa=ogPos(c1,r1), pb=ogPos(c2,r2);
+    const mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2;
+    const energized = !sim.shorted && poweredAny && (sim.find(e.a)===sim.plus||sim.find(e.a)===sim.minus);
+    let col = energized?'#ffcf5c':'#5a6d8a';
+    s+='<line x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="'+col+'" stroke-width="3"'
+      +(el.type==='switch'&&!el.on?' stroke-dasharray="6 4"':'')+' data-e="'+e.id+'" style="cursor:pointer"/>'
+      +'<line x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="transparent" stroke-width="16" data-e="'+e.id+'" style="cursor:pointer"/>';
+    if(el.type==='switch'){
+      s+='<circle cx="'+mx+'" cy="'+my+'" r="6" fill="'+(el.on?'#4ade80':'#161f2e')+'" stroke="#7f92ad" stroke-width="1.6" pointer-events="none"/>';
+    }else if(el.type==='bulb'){
+      s+=bulb(mx,my,sim.powered[e.id]?1:0,false).replace(/data-e="[^"]*"/g,'');
+    }else if(el.type==='socket'){
+      const on=!!sim.powered[e.id];
+      s+='<rect x="'+(mx-11)+'" y="'+(my-9)+'" width="22" height="18" rx="4" fill="'+(on?'#ffcf5c':'#232f42')+'" stroke="#7f92ad" stroke-width="1.6" pointer-events="none"/>'
+       +'<circle cx="'+(mx-4)+'" cy="'+my+'" r="1.6" fill="#161f2e" pointer-events="none"/><circle cx="'+(mx+4)+'" cy="'+my+'" r="1.6" fill="#161f2e" pointer-events="none"/>';
+    }
+  });
+  // uzly (sběrnicové sloupce = barevné tečky, vnitřní uzly = šedé)
+  for(let r=0;r<OG_ROWS;r++) for(let c=0;c<OG_COLS;c++){
+    const id=ogId(c,r), p=ogPos(c,r);
+    if(OG_PLUS_NODES.includes(id)) s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#e04a4a" stroke="#fff" stroke-width="1.3" pointer-events="none"/>';
+    else if(OG_MINUS_NODES.includes(id)) s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#3a6fc4" stroke="#fff" stroke-width="1.3" pointer-events="none"/>';
+    else s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="#4a5a75" pointer-events="none"/>';
+  }
+  s+='</svg>';
+  $('#ogSvg').innerHTML=s;
+  $('#ogSvg').querySelectorAll('[data-e]').forEach(el=>{
+    el.addEventListener('click', ()=>ogEdgeClick(el.dataset.e));
+  });
+  // seznam vypínačů
+  const sws=Object.keys(og.edges).filter(id=>og.edges[id].type==='switch').sort();
+  $('#ogSwitches').innerHTML = sws.length
+    ? sws.map((id,i)=>'<button aria-pressed="'+(og.edges[id].on?'true':'false')+'" onclick="ogToggleSwitch(\''+id+'\')">Vypínač '+(i+1)+': '+(og.edges[id].on?'ZAP':'VYP')+'</button>').join('')
+    : '<span class="small">Zatím žádný vypínač v obvodu.</span>';
+  $('#ogFb').innerHTML=og.fbHtml;
+  $('#ogInfo').innerHTML = sim.shorted
+    ? '⚡ <b>ZKRAT!</b> Propojil jsi + a − napřímo (jen dráty/vypínači, bez spotřebiče). V realitě by tohle vyhodilo pojistku nebo shořel drát – proto se + a − nikdy nesmí spojit bez zátěže.'
+    : 'Klepni na tečkovanou hranu a polož vybraný nástroj. Žlutá = pod napětím. Barevné proužky a diody z ostatních modulů fungují stejně – tady je skládáš do celého domu.';
+}
 
 /* ---------- start ---------- */
 renderLearn();
