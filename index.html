@@ -200,12 +200,15 @@ td.hit{color:var(--ok)} td.miss{color:var(--bad)}
     <div id="gBuild" hidden>
       <div class="card">
         <h2>Výzva: postav správný obvod</h2>
-        <p class="hint">Máš obvod se dvěma hradly. <b>Klepnutím na hradlo v obrázku</b> měníš jeho typ (AND → OR → XOR → NAND → NOR). Tvůj úkol: nastavit obě hradla tak, aby výstup odpovídal <b>cílové tabulce</b> pro všech 8 kombinací vstupů. Vstupy A, B, C si můžeš přepínat a zkoušet.</p>
+        <p class="hint">Vyber typy obou hradel v nabídce pod obvodem tak, aby výstup odpovídal <b>cílové tabulce</b> pro všech 8 kombinací. Přepínáním vstupů A, B, C si obvod <b>sám otestuj</b> – sleduj OUT a porovnávej s cílem. Až si budeš jistý, dej <b>Zkontrolovat</b>. Každá neúspěšná kontrola stojí −5 b. z odměny, takže napřed testuj, pak potvrzuj!</p>
         <div class="svgbox" id="buildCircuit"></div>
+        <div class="chips" id="bg1Chips"></div>
+        <div class="chips" id="bg2Chips"></div>
         <div class="rowbtns" id="buildInputs"></div>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="checkBuild()">✅ Zkontrolovat obvod</button>
         <button class="btn ghost" id="buildHintBtn" onclick="buildHint()">💡 Nápověda</button>
         <div id="buildHints"></div>
-        <div class="progress">Shoda s cílem: <b id="matchCount">0/8</b></div>
+        <div class="progress">Shoda s cílem: <b id="matchCount">?/8</b></div>
         <div id="buildTT"></div>
         <div id="buildFb"></div>
         <button class="btn primary" id="buildNext" onclick="newChallenge()" hidden>Další výzva ▸</button>
@@ -751,7 +754,7 @@ function renderLearnGate(){
 
 /* --- Skládej --- */
 const G2=['AND','OR','XOR','NAND','NOR'];
-let bld={g1:'AND', g2:'OR', a:0,b:0,c:0, t1:null,t2:null, solved:false};
+let bld={g1:'AND', g2:'OR', a:0,b:0,c:0, t1:null,t2:null, solved:false, wrong:0};
 function tableFor(g1,g2){
   const out=[];
   for(let a=0;a<=1;a++)for(let b=0;b<=1;b++)for(let c=0;c<=1;c++){
@@ -765,19 +768,20 @@ function newChallenge(){
   do{
     bld.t1=rnd(G2); bld.t2=rnd(G2);
   }while(guard++<20 && sameTable(tableFor(bld.t1,bld.t2), tableFor(bld.g1,bld.g2)));
-  bld.solved=false;
+  bld.solved=false; bld.wrong=0;
   bldHintsUsed=0; $('#buildHints').innerHTML='';
   const hb=$('#buildHintBtn'); hb.disabled=false; hb.textContent='💡 Nápověda 1/3 (−7 b.)';
   $('#buildFb').innerHTML=''; $('#buildNext').hidden=true;
+  $('#matchCount').textContent='?/8';
   renderBuild();
 }
 let bldHintsUsed=0;
 function buildHintTexts(){
   const target=tableFor(bld.t1,bld.t2);
   const t=[];
-  t.push('Strategie: řádek A=1, B=1, C=1 hodně napoví o hradle 2 – cílový výstup je pro něj '+target[7]+'. Zkus nejdřív měnit jen hradlo 2 a sleduj, kolik řádků sedí.');
+  t.push('Strategie: řádek A=1, B=1, C=1 hodně napoví o hradle 2 – cílový výstup je pro něj '+target[7]+'. Nastav vstupy na 1-1-1 a zkoušej, které hradlo 2 dá správný OUT.');
   t.push('Jedno z možných řešení má jako hradlo 1 typ '+bld.t1+'. (Počítá se shoda celé tabulky, takže někdy funguje i jiná kombinace.)');
-  t.push('A hradlo 2 je v tomto řešení '+bld.t2+'. Nastav obě hradla a zkontroluj všech 8 řádků.');
+  t.push('A hradlo 2 je v tomto řešení '+bld.t2+'. Nastav obě hradla, otestuj pár kombinací vstupů a dej Zkontrolovat.');
   return t;
 }
 function buildHint(){
@@ -793,17 +797,15 @@ function buildHint(){
   if(bldHintsUsed>=texts.length){ btn.disabled=true; btn.textContent='💡 Víc nápověd už není'; }
   else btn.textContent='💡 Nápověda '+(bldHintsUsed+1)+'/'+texts.length+' (−7 b.)';
 }
-function cycleGate(which){
+function setBG(which,t){
   if(bld.solved) return;
-  const cur=which===1?bld.g1:bld.g2;
-  const nxt=G2[(G2.indexOf(cur)+1)%G2.length];
-  if(which===1) bld.g1=nxt; else bld.g2=nxt;
+  if(which===1) bld.g1=t; else bld.g2=t;
   renderBuild();
 }
 function renderBuild(){
   const v1=GATE_FN[bld.g1](bld.a,bld.b);
   const out=GATE_FN[bld.g2](v1,bld.c);
-  const s1=gateShape(bld.g1,'1',bld.g1), s2=gateShape(bld.g2,'2',bld.g2);
+  const s1=gateShape(bld.g1,null,bld.g1), s2=gateShape(bld.g2,null,bld.g2);
   const g1x=110,g1y=20, g2x=210,g2y=90;
   let s='<svg viewBox="0 0 340 190" width="340" aria-label="obvod se dvěma hradly">';
   s+=w(50,30,g1x,30,bld.a);
@@ -816,38 +818,57 @@ function renderBuild(){
   s+='<g transform="translate('+g2x+','+g2y+')">'+s2.svg+'</g>';
   s+=w(g2x+s2.outX,110,308,110,out);
   s+=ledC(318,110,out);
-  s+='<text class="svglabel" x="'+(g1x)+'" y="14">↻ klepni</text>';
-  s+='<text class="svglabel" x="'+(g2x)+'" y="84">↻ klepni</text>';
+  s+='<text class="svglabel" x="'+g1x+'" y="14">hradlo 1</text>';
+  s+='<text class="svglabel" x="'+g2x+'" y="84">hradlo 2</text>';
   s+='</svg>';
   $('#buildCircuit').innerHTML=s;
-  $('#buildCircuit').querySelectorAll('[data-gate]').forEach(el=>{
-    el.addEventListener('click', ()=>cycleGate(+el.dataset.gate));
-  });
+  $('#bg1Chips').innerHTML='<span class="small" style="align-self:center">Hradlo 1:</span>'
+    +G2.map(t=>'<button aria-selected="'+(bld.g1===t)+'" onclick="setBG(1,\''+t+'\')">'+t+'</button>').join('');
+  $('#bg2Chips').innerHTML='<span class="small" style="align-self:center">Hradlo 2:</span>'
+    +G2.map(t=>'<button aria-selected="'+(bld.g2===t)+'" onclick="setBG(2,\''+t+'\')">'+t+'</button>').join('');
   $('#buildInputs').innerHTML=
     '<button aria-pressed="'+(bld.a?'true':'false')+'" onclick="bld.a^=1;renderBuild()">A: '+bld.a+'</button>'+
     '<button aria-pressed="'+(bld.b?'true':'false')+'" onclick="bld.b^=1;renderBuild()">B: '+bld.b+'</button>'+
     '<button aria-pressed="'+(bld.c?'true':'false')+'" onclick="bld.c^=1;renderBuild()">C: '+bld.c+'</button>';
-  // porovnání s cílem
+  renderBuildTable(bld.solved);
+}
+function renderBuildTable(reveal){
   const target=tableFor(bld.t1,bld.t2);
   const mine=tableFor(bld.g1,bld.g2);
-  let hits=0, rows='', i=0;
+  let rows='', i=0;
   for(let a=0;a<=1;a++)for(let b=0;b<=1;b++)for(let c=0;c<=1;c++){
-    const hit=mine[i]===target[i]; if(hit)hits++;
     const cur=(a===bld.a&&b===bld.b&&c===bld.c);
-    rows+='<tr'+(cur?' class="cur"':'')+'><td>'+a+'</td><td>'+b+'</td><td>'+c+'</td>'
-        +'<td>'+target[i]+'</td><td class="'+(hit?'hit':'miss')+'">'+mine[i]+' '+(hit?'✓':'✗')+'</td></tr>';
+    rows+='<tr'+(cur?' class="cur"':'')+'><td>'+a+'</td><td>'+b+'</td><td>'+c+'</td><td>'+target[i]+'</td>';
+    if(reveal){
+      const hit=mine[i]===target[i];
+      rows+='<td class="'+(hit?'hit':'miss')+'">'+mine[i]+' '+(hit?'✓':'✗')+'</td>';
+    }
+    rows+='</tr>';
     i++;
   }
-  $('#buildTT').innerHTML='<table class="tt"><tr><th>A</th><th>B</th><th>C</th><th>Cíl</th><th>Tvůj obvod</th></tr>'+rows+'</table>';
-  $('#matchCount').textContent=hits+'/8';
-  if(hits===8 && !bld.solved){
+  $('#buildTT').innerHTML='<table class="tt"><tr><th>A</th><th>B</th><th>C</th><th>Cíl</th>'
+    +(reveal?'<th>Tvůj obvod</th>':'')+'</tr>'+rows+'</table>';
+}
+function checkBuild(){
+  if(bld.solved){ $('#buildFb').innerHTML='<div class="small">Vyřešeno – dej si Další výzva.</div>'; return; }
+  const target=tableFor(bld.t1,bld.t2);
+  const mine=tableFor(bld.g1,bld.g2);
+  let hits=0;
+  for(let i=0;i<8;i++) if(mine[i]===target[i]) hits++;
+  if(hits===8){
     bld.solved=true;
-    const penalty=bldHintsUsed*7;
+    const penalty=bldHintsUsed*7+bld.wrong*5;
     const earned=Math.max(4, 25-penalty);
     addPoints(earned);
     $('#buildHintBtn').disabled=true;
-    $('#buildFb').innerHTML='<div class="feedback ok">✔ Vyřešeno! Obvod dělá přesně to, co má. +'+earned+' bodů'+(penalty?' (−'+penalty+' za nápovědy)':'')+'</div>';
+    $('#matchCount').textContent='8/8';
+    renderBuildTable(true);
+    $('#buildFb').innerHTML='<div class="feedback ok">✔ Obvod dělá přesně to, co má! +'+earned+' bodů'+(penalty?' (−'+penalty+' za nápovědy/pokusy)':'')+'</div>';
     $('#buildNext').hidden=false;
+  }else{
+    bld.wrong++;
+    $('#matchCount').textContent=hits+'/8';
+    $('#buildFb').innerHTML='<div class="feedback bad">✘ Sedí '+hits+' z 8 kombinací (−5 b. z odměny). Přepínej vstupy A/B/C, porovnávej OUT s cílem a najdi, kde se obvod liší.</div>';
   }
 }
 
