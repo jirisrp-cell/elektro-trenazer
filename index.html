@@ -7677,7 +7677,7 @@ const { $, h, near, parseNum, S, save, award, addXP, sound, showFb, theory, labH
 
 /* ← sem po nasazení backendu vlož adresu Railway služby, např. 'https://elektro-ai.up.railway.app'.
    Žák ji může vyplnit i sám v aplikaci (Nastavení spojení), pak se uloží v prohlížeči. */
-const API_URL = 'elektro-trenazer-production.up.railway.app';
+const API_URL = 'https://elektro-trenazer-production.up.railway.app';
 const URL_KEY = 'elektro-akademie-api';
 
 const getBase = () => { let u = ''; try { u = localStorage.getItem(URL_KEY) || ''; } catch (e) {} return (u || API_URL).trim().replace(/\/+$/, ''); };
